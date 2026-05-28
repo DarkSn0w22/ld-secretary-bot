@@ -226,7 +226,13 @@ def webhook():
             reply_token = event["replyToken"]
 
             print(f"📩 User {user_id[:8]}...: {user_message}")
-            response = get_claude_response(user_id, user_message)
+
+# Special command
+if user_message.strip() == "/myid":
+    reply_message(reply_token, f"Your LINE User ID:\n{user_id}")
+    continue
+
+response = get_claude_response(user_id, user_message)
             print(f"🤖 Bot: {response[:100]}...")
             reply_message(reply_token, response)
 
