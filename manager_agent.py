@@ -7,6 +7,7 @@ import os
 import json
 import anthropic
 from sheets_tools import get_survey_summary, get_oar_summary
+from google_search import google_search
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -40,6 +41,17 @@ MANAGER_PROMPT = """คุณคือ "Atlas" — Manager AI ของ OWNDAYS 
 
 MANAGER_TOOLS = [
     {
+        "name": "web_search",
+        "description": "ค้นหาข้อมูลจาก Google เช่น benchmark, best practices, trend, สถิติ",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "คำค้นหา"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
         "name": "get_survey_data",
         "description": "ดึงข้อมูล Training Survey จาก Google Sheets",
         "input_schema": {"type": "object", "properties": {}, "required": []}
@@ -67,7 +79,9 @@ MANAGER_TOOLS = [
 
 
 def execute_manager_tool(tool_name: str, tool_input: dict) -> str:
-    if tool_name == "get_survey_data":
+    if tool_name == "web_search":
+        return google_search(tool_input.get("query", ""))
+    elif tool_name == "get_survey_data":
         return get_survey_summary()
     elif tool_name == "get_oar_data":
         return get_oar_summary()

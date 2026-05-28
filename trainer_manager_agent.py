@@ -6,6 +6,7 @@ Trainer Manager AI — "Pulse"
 import os
 import anthropic
 from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, SHEET_IDS
+from google_search import google_search
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -48,8 +49,19 @@ Program (Q6-10): สื่อ, กิจกรรม, สถานที่, เ
 PULSE_TOOLS = [
     {
         "name": "get_all_ld_data",
-        "description": "ดึงข้อมูล Survey + OAR ทั้งหมดมาพร้อมกันในครั้งเดียว ใช้สำหรับวิเคราะห์ trainer, หลักสูตร, และภาพรวม L&D",
+        "description": "ดึงข้อมูล Survey + OAR ทั้งหมดมาพร้อมกันในครั้งเดียว",
         "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "web_search",
+        "description": "ค้นหาข้อมูลจาก Google เช่น benchmark, best practices, trend",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "คำค้นหา"}
+            },
+            "required": ["query"]
+        }
     }
 ]
 
@@ -61,6 +73,9 @@ def execute_pulse_tool(tool_name: str, tool_input: dict) -> str:
         sheets = get_sheet_names(SHEET_IDS["survey"])
         sheet_list = ", ".join(sheets) if sheets else "ไม่พบ"
         return f"Survey Data:\n{survey}\n\nOAR Data:\n{oar}\n\nAvailable courses: {sheet_list}"
+    elif tool_name == "web_search":
+        query = tool_input.get("query", "")
+        return google_search(query)
     return "ไม่พบ tool นี้"
 
 

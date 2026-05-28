@@ -15,7 +15,7 @@ from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, S
 from memory import init_db, load_history, save_message, clear_history, get_message_count
 from scheduler import start_scheduler
 from manager_agent import run_manager, run_scheduled_task
-from researcher_agent import run_researcher, run_scheduled_research
+from google_search import google_search
 from trainer_manager_agent import run_trainer_manager
 
 app = Flask(__name__)
@@ -72,14 +72,14 @@ TOOLS = [
         }
     },
     {
-        "name": "ask_researcher",
-        "description": "ให้ Researcher AI (Scout) ค้นหาข้อมูลจากอินเทอร์เน็ต เช่น benchmark L&D, best practices, trend การฝึกอบรม",
+        "name": "web_search",
+        "description": "ค้นหาข้อมูลจาก Google เช่น benchmark L&D, best practices, trend, สถิติ, ข่าวล่าสุด",
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "หัวข้อที่ต้องการค้นหา"
+                    "description": "คำค้นหา"
                 }
             },
             "required": ["query"]
@@ -114,9 +114,9 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "ask_manager":
         task = tool_input.get("task", "")
         return run_manager(task)
-    elif tool_name == "ask_researcher":
+    elif tool_name == "web_search":
         query = tool_input.get("query", "")
-        return run_researcher(query)
+        return google_search(query)
     elif tool_name == "ask_trainer_manager":
         task = tool_input.get("task", "")
         return run_trainer_manager(task)
@@ -182,6 +182,8 @@ MEGA Bangna, Zpell @ Future Park, Central Eastville, Seacon Bangkae, Seacon Squa
 == สิ่งที่ยังทำไม่ได้ (แจ้งตรงๆ) ==
 - เช็ค/ส่ง Email @owndays.com (ต้องรอ IT อนุมัติ)
 - เช็ค Google Calendar (กำลังพัฒนา)
+
+เมื่อต้องค้นหาข้อมูลจากอินเทอร์เน็ต ให้ใช้ web_search tool ได้เลย ไม่ต้องพึ่ง agent อื่น
 """
 
 
