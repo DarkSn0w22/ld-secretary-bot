@@ -1,6 +1,6 @@
 """
-OWNDAYS L&D Secretary Bot v2
-AI Agent เลขา — LINE Bot + Claude API + Google Sheets
+OWNDAYS L&D Secretary Bot v6
+LINE Bot + Claude API + Google Sheets + PostgreSQL Memory
 """
 
 import os
@@ -12,25 +12,32 @@ from flask import Flask, request, abort
 import anthropic
 import requests
 from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, SHEET_IDS
+from memory import init_db, load_history, save_message, clear_history, get_message_count
 from scheduler import start_scheduler
 
 app = Flask(__name__)
 
-LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "your-channel-secret")
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "your-access-token")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "your-anthropic-key")
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+# Init DB on startup
+init_db()
+
+# =============================================================
+# TOOLS
+# =============================================================
 TOOLS = [
     {
         "name": "get_survey_data",
-        "description": "ดึงข้อมูล Training Survey จาก Google Sheets เพื่อดูคะแนนความพึงพอใจการอบรม",
+        "description": "ดึงข้อมูล Training Survey จาก Google Sheets",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "get_oar_data",
-        "description": "ดึงข้อมูล Training Registration (OAR) จาก Google Sheets เพื่อดูการลงทะเบียนอบรม",
+        "description": "ดึงข้อมูล Training Registration (OAR) จาก Google Sheets",
         "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
@@ -41,7 +48,6 @@ TOOLS = [
             "properties": {
                 "sheet_key": {
                     "type": "string",
-                    "description": "ชื่อ sheet: survey, dashboard, หรือ oar",
                     "enum": ["survey", "dashboard", "oar"]
                 }
             },
@@ -63,6 +69,9 @@ def execute_tool(tool_name, tool_input):
     return "ไม่พบ tool นี้"
 
 
+# =============================================================
+# SYSTEM PROMPT
+# =============================================================
 SECRETARY_PROMPT = """คุณคือ "Rocket" — AI เลขาส่วนตัวของ Peanut ผู้ชาย ทำงานให้ตลอด 24 ชั่วโมง
 
 == บุคลิกและการสื่อสาร ==
@@ -118,24 +127,20 @@ MEGA Bangna, Zpell @ Future Park, Central Eastville, Seacon Bangkae, Seacon Squa
 
 == สิ่งที่ยังทำไม่ได้ (แจ้งตรงๆ) ==
 - เช็ค/ส่ง Email @owndays.com (ต้องรอ IT อนุมัติ)
-- เช็ค Google Calendar (กำลังพัฒนา Step 3)
-- จำข้อมูลข้ามวัน (กำลังพัฒนา Step 4)
+- เช็ค Google Calendar (กำลังพัฒนา)
 """
 
-conversations = {}
-MAX_HISTORY = 20
 
+# =============================================================
+# CLAUDE RESPONSE
+# =============================================================
+def get_claude_response(user_id: str, message: str) -> str:
+    # โหลด history จาก DB
+    history = load_history(user_id, limit=20)
 
-def get_claude_response(user_id, message):
-    if user_id not in conversations:
-        conversations[user_id] = []
-
-    history = conversations[user_id]
+    # เพิ่มข้อความใหม่
     history.append({"role": "user", "content": message})
-
-    if len(history) > MAX_HISTORY:
-        history = history[-MAX_HISTORY:]
-        conversations[user_id] = history
+    save_message(user_id, "user", message)
 
     try:
         while True:
@@ -149,6 +154,8 @@ def get_claude_response(user_id, message):
 
             if response.stop_reason == "tool_use":
                 history.append({"role": "assistant", "content": response.content})
+                save_message(user_id, "assistant", response.content)
+
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
@@ -159,7 +166,9 @@ def get_claude_response(user_id, message):
                             "tool_use_id": block.id,
                             "content": result
                         })
+
                 history.append({"role": "user", "content": tool_results})
+                save_message(user_id, "user", tool_results)
                 continue
 
             final_text = ""
@@ -167,7 +176,7 @@ def get_claude_response(user_id, message):
                 if hasattr(block, "text"):
                     final_text += block.text
 
-            history.append({"role": "assistant", "content": final_text})
+            save_message(user_id, "assistant", final_text)
             return final_text
 
     except Exception as e:
@@ -175,6 +184,9 @@ def get_claude_response(user_id, message):
         return "ขอโทษครับ ระบบมีปัญหาชั่วคราว กรุณาลองใหม่อีกครั้ง"
 
 
+# =============================================================
+# LINE
+# =============================================================
 def verify_signature(body, signature):
     hash = hmac.new(
         LINE_CHANNEL_SECRET.encode("utf-8"),
@@ -200,9 +212,12 @@ def reply_message(reply_token, text):
     requests.post(url, headers=headers, json=payload)
 
 
+# =============================================================
+# ROUTES
+# =============================================================
 @app.route("/", methods=["GET"])
 def health_check():
-    return "LD Secretary Bot v2 is running!", 200
+    return "LD Secretary Bot v6 - Rocket is running!", 200
 
 
 @app.route("/webhook", methods=["POST"])
@@ -223,8 +238,15 @@ def webhook():
 
             print(f"User {user_id[:8]}...: {user_message}")
 
+            # Special commands
             if user_message.strip() == "/myid":
                 reply_message(reply_token, f"Your LINE User ID:\n{user_id}")
+            elif user_message.strip() == "/clearmemory":
+                success = clear_history(user_id)
+                reply_message(reply_token, "ลบความจำทั้งหมดแล้วครับ 🗑️" if success else "เกิดข้อผิดพลาดครับ")
+            elif user_message.strip() == "/memstats":
+                count = get_message_count(user_id)
+                reply_message(reply_token, f"มีข้อความในความจำทั้งหมด {count} ข้อความครับ 🧠")
             else:
                 response = get_claude_response(user_id, user_message)
                 print(f"Bot: {response[:100]}...")
@@ -233,10 +255,10 @@ def webhook():
     return "OK", 200
 
 
-# Start scheduler when app boots
+# Start scheduler
 start_scheduler()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
-    print(f"LD Secretary Bot v2 starting on port {port}")
+    print(f"Rocket starting on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)

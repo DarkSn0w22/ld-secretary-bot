@@ -5,3 +5,4 @@ gunicorn==23.0.0
 google-auth==2.38.0
 google-api-python-client==2.166.0
 pytz==2025.2
+psycopg2-binary==2.9.10
