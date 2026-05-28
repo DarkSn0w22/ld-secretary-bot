@@ -6,7 +6,7 @@ Manager AI — Background Orchestrator
 import os
 import json
 import anthropic
-from sheets_tools import get_survey_summary, get_oar_summary
+from dashboard_api import get_survey_dashboard, get_oar_dashboard, get_area_dashboard, get_cost_dashboard, get_all_dashboard
 from google_search import google_search
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
@@ -82,14 +82,12 @@ def execute_manager_tool(tool_name: str, tool_input: dict) -> str:
     if tool_name == "web_search":
         return google_search(tool_input.get("query", ""))
     elif tool_name == "get_survey_data":
-        return get_survey_summary()
+        return get_survey_dashboard()
     elif tool_name == "get_oar_data":
-        return get_oar_summary()
+        return get_oar_dashboard()
     elif tool_name == "analyze_and_recommend":
         focus = tool_input.get("focus_area", "general")
-        survey_data = get_survey_summary()
-        oar_data = get_oar_summary()
-        return f"ข้อมูลสำหรับวิเคราะห์ด้าน {focus}:\n\nSurvey:\n{survey_data}\n\nOAR:\n{oar_data}"
+        return get_all_dashboard()
     return "ไม่พบ tool นี้"
 
 
