@@ -233,8 +233,7 @@ if user_message.strip() == "/myid":
 else:
     response = get_claude_response(user_id, user_message)
     print(f"🤖 Bot: {response[:100]}...")
-    reply_message(reply_token, response)
-
+   reply_message(reply_token, response)
 
     return "OK", 200
 
