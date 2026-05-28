@@ -230,11 +230,11 @@ def webhook():
 # Special command
 if user_message.strip() == "/myid":
     reply_message(reply_token, f"Your LINE User ID:\n{user_id}")
-    continue
+else:
+    response = get_claude_response(user_id, user_message)
+    print(f"🤖 Bot: {response[:100]}...")
+    reply_message(reply_token, response)
 
-response = get_claude_response(user_id, user_message)
-            print(f"🤖 Bot: {response[:100]}...")
-            reply_message(reply_token, response)
 
     return "OK", 200
 
