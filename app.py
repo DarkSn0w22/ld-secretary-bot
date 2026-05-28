@@ -15,6 +15,7 @@ from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, S
 from memory import init_db, load_history, save_message, clear_history, get_message_count
 from scheduler import start_scheduler
 from manager_agent import run_manager, run_scheduled_task
+from researcher_agent import run_researcher, run_scheduled_research
 
 app = Flask(__name__)
 
@@ -68,6 +69,20 @@ TOOLS = [
             },
             "required": ["task"]
         }
+    },
+    {
+        "name": "ask_researcher",
+        "description": "ให้ Researcher AI (Scout) ค้นหาข้อมูลจากอินเทอร์เน็ต เช่น benchmark L&D, best practices, trend การฝึกอบรม",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "หัวข้อที่ต้องการค้นหา"
+                }
+            },
+            "required": ["query"]
+        }
     }
 ]
 
@@ -84,6 +99,9 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "ask_manager":
         task = tool_input.get("task", "")
         return run_manager(task)
+    elif tool_name == "ask_researcher":
+        query = tool_input.get("query", "")
+        return run_researcher(query)
     return "ไม่พบ tool นี้"
 
 

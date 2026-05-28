@@ -80,7 +80,18 @@ def save_message(user_id: str, role: str, content):
 
         # ถ้า content ไม่ใช่ string ให้แปลงเป็น JSON
         if not isinstance(content, str):
-            content = json.dumps(content, ensure_ascii=False)
+            if isinstance(content, list):
+                serializable = []
+                for item in content:
+                    if hasattr(item, 'model_dump'):
+                        serializable.append(item.model_dump())
+                    elif hasattr(item, '__dict__'):
+                        serializable.append(item.__dict__)
+                    else:
+                        serializable.append(item)
+                content = json.dumps(serializable, ensure_ascii=False)
+            else:
+                content = json.dumps(content, ensure_ascii=False)
 
         cur.execute("""
             INSERT INTO conversations (user_id, role, content)
