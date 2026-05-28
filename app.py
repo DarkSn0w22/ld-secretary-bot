@@ -6,7 +6,6 @@ LINE Bot + Claude API + Google Sheets + PostgreSQL Memory
 import os
 import json
 import hashlib
-import threading
 import hmac
 import base64
 from flask import Flask, request, abort
@@ -117,7 +116,7 @@ def execute_tool(tool_name, tool_input):
         return run_manager(task)
     elif tool_name == "ask_researcher":
         query = tool_input.get("query", "")
-        return f"Scout กำลังค้นหา: {query}\nผลจะส่งให้ทาง LINE ภายใน 1-2 นาทีครับ"
+        return run_researcher(query)
     elif tool_name == "ask_trainer_manager":
         task = tool_input.get("task", "")
         return run_trainer_manager(task)
