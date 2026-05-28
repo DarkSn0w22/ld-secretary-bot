@@ -17,6 +17,7 @@ from memory import init_db, load_history, save_message, clear_history, get_messa
 from scheduler import start_scheduler
 from manager_agent import run_manager, run_scheduled_task
 from researcher_agent import run_researcher, run_scheduled_research
+from trainer_manager_agent import run_trainer_manager
 
 app = Flask(__name__)
 
@@ -84,6 +85,20 @@ TOOLS = [
             },
             "required": ["query"]
         }
+    },
+    {
+        "name": "ask_trainer_manager",
+        "description": "ให้ Trainer Manager AI (Pulse) วิเคราะห์หลักสูตร ติดตาม trainer performance และเสนอแนวทางพัฒนา",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "งานที่ต้องการเช่น วิเคราะห์ trainer, สรุปหลักสูตร, หา low score"
+                }
+            },
+            "required": ["task"]
+        }
     }
 ]
 
@@ -102,8 +117,10 @@ def execute_tool(tool_name, tool_input):
         return run_manager(task)
     elif tool_name == "ask_researcher":
         query = tool_input.get("query", "")
-        # Scout อาจใช้เวลานาน — ส่ง placeholder กลับก่อน แล้วค่อย push ผล
         return f"Scout กำลังค้นหา: {query}\nผลจะส่งให้ทาง LINE ภายใน 1-2 นาทีครับ"
+    elif tool_name == "ask_trainer_manager":
+        task = tool_input.get("task", "")
+        return run_trainer_manager(task)
     return "ไม่พบ tool นี้"
 
 

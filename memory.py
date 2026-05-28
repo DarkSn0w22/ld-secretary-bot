@@ -1,6 +1,6 @@
 """
 Memory Module — PostgreSQL
-เก็บ conversation history ข้ามวัน
+เก็บ conversation history ข้ามวัน (text only)
 """
 
 import os
@@ -37,80 +37,14 @@ def init_db():
         print(f"DB init error: {e}")
 
 
-def _sanitize_history(history: list) -> list:
-    """
-    ทำความสะอาด history ก่อนส่งให้ Claude
-    - กรอง tool_result ที่ไม่มี tool_use คู่กันออก
-    - กรอง assistant message ที่มีแค่ tool_use block (ไม่มี text) ออก
-    """
-    clean = []
-    i = 0
-    while i < len(history):
-        msg = history[i]
-
-        if msg["role"] == "assistant":
-            content = msg["content"]
-            # ถ้า content เป็น list ให้เช็คว่ามี text block ไหม
-            if isinstance(content, list):
-                has_text = any(
-                    (isinstance(b, dict) and b.get("type") == "text" and b.get("text", "").strip())
-                    for b in content
-                )
-                has_tool_use = any(
-                    (isinstance(b, dict) and b.get("type") == "tool_use")
-                    for b in content
-                )
-                if has_tool_use and not has_text:
-                    # assistant message ที่มีแค่ tool_use — ข้ามทั้ง assistant + user(tool_result) ถัดไป
-                    i += 1
-                    if i < len(history) and history[i]["role"] == "user":
-                        user_content = history[i]["content"]
-                        if isinstance(user_content, list) and any(
-                            isinstance(b, dict) and b.get("type") == "tool_result"
-                            for b in user_content
-                        ):
-                            i += 1  # ข้าม tool_result ด้วย
-                    continue
-            clean.append(msg)
-
-        elif msg["role"] == "user":
-            content = msg["content"]
-            # ถ้าเป็น tool_result แต่ไม่มี assistant tool_use ก่อนหน้า — ข้าม
-            if isinstance(content, list) and any(
-                isinstance(b, dict) and b.get("type") == "tool_result"
-                for b in content
-            ):
-                # เช็ค message ก่อนหน้าว่ามี tool_use ไหม
-                if clean and clean[-1]["role"] == "assistant":
-                    prev = clean[-1]["content"]
-                    if isinstance(prev, list) and any(
-                        isinstance(b, dict) and b.get("type") == "tool_use"
-                        for b in prev
-                    ):
-                        clean.append(msg)
-                        i += 1
-                        continue
-                # ไม่มี tool_use คู่ — ข้าม
-                i += 1
-                continue
-            clean.append(msg)
-
-        i += 1
-
-    return clean
-
-
 def load_history(user_id: str, limit: int = 20) -> list:
-    """โหลด conversation history ของ user (เฉพาะ text messages)"""
+    """โหลดเฉพาะ text message ธรรมดา ไม่เอา tool blocks"""
     try:
         conn = get_conn()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        # โหลดเฉพาะ text messages ธรรมดา ไม่เอา tool_use/tool_result
+        cur = conn.cursor()
         cur.execute("""
             SELECT role, content FROM conversations
             WHERE user_id = %s
-            AND content NOT LIKE '%tool_use%'
-            AND content NOT LIKE '%tool_result%'
             ORDER BY created_at DESC
             LIMIT %s
         """, (user_id, limit))
@@ -120,16 +54,24 @@ def load_history(user_id: str, limit: int = 20) -> list:
 
         history = []
         for row in reversed(rows):
-            content = row["content"]
+            role = row[0]
+            content = row[1]
+
+            # ข้าม tool-related content
+            if "tool_use" in content or "tool_result" in content:
+                continue
+
+            # ข้าม JSON arrays
             try:
                 parsed = json.loads(content)
-                # ถ้า parse แล้วได้ list ที่มี tool block — ข้าม
                 if isinstance(parsed, list):
                     continue
                 content = parsed
             except Exception:
                 pass
-            history.append({"role": row["role"], "content": content})
+
+            if content and str(content).strip():
+                history.append({"role": role, "content": str(content)})
 
         return history
 
@@ -139,21 +81,21 @@ def load_history(user_id: str, limit: int = 20) -> list:
 
 
 def save_message(user_id: str, role: str, content):
-    """บันทึกเฉพาะ text message ธรรมดาลง database"""
+    """บันทึกเฉพาะ plain text เท่านั้น"""
     try:
-        # บันทึกแค่ string content (ไม่บันทึก tool use/result)
         if not isinstance(content, str):
-            return  # ข้าม tool blocks ทั้งหมด
-
+            return
         if not content.strip():
-            return  # ข้าม empty string
+            return
+        if "tool_use" in content or "tool_result" in content:
+            return
 
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO conversations (user_id, role, content)
-            VALUES (%s, %s, %s)
-        """, (user_id, role, content))
+        cur.execute(
+            "INSERT INTO conversations (user_id, role, content) VALUES (%s, %s, %s)",
+            (user_id, role, content)
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -181,9 +123,9 @@ def get_message_count(user_id: str) -> int:
         conn = get_conn()
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM conversations WHERE user_id = %s", (user_id,))
-        count = cur.fetchone()[0]
+        row = cur.fetchone()
         cur.close()
         conn.close()
-        return count
+        return row[0] if row else 0
     except Exception:
         return 0
