@@ -18,6 +18,7 @@ from manager_agent import run_manager, run_scheduled_task
 from google_search import google_search
 from trainer_manager_agent import run_trainer_manager
 from reporter_agent import run_reporter
+from reviewer_agent import run_reviewer
 
 app = Flask(__name__)
 
@@ -113,6 +114,24 @@ TOOLS = [
             },
             "required": []
         }
+    },
+    {
+        "name": "ask_reviewer",
+        "description": "ให้ Reviewer/QA AI (Guard) ตรวจสอบคุณภาพงานก่อนส่งออก เช่น รายงาน, email, เนื้อหาการฝึกอบรม",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "เนื้อหาที่ต้องการตรวจสอบ"
+                },
+                "content_type": {
+                    "type": "string",
+                    "description": "ประเภทงาน เช่น report, email, training_material, analysis"
+                }
+            },
+            "required": ["content"]
+        }
     }
 ]
 
@@ -138,6 +157,10 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "ask_reporter":
         report_type = tool_input.get("report_type", "weekly")
         return run_reporter(report_type)
+    elif tool_name == "ask_reviewer":
+        review_content = tool_input.get("content", "")
+        content_type = tool_input.get("content_type", "report")
+        return run_reviewer(review_content, content_type)
     return "ไม่พบ tool นี้"
 
 
