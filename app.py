@@ -20,6 +20,7 @@ from trainer_manager_agent import run_trainer_manager
 from reporter_agent import run_reporter
 from reviewer_agent import run_reviewer
 from financial_agent import run_financial_manager
+from legal_agent import run_legal_manager
 
 app = Flask(__name__)
 
@@ -147,6 +148,20 @@ TOOLS = [
             },
             "required": ["task"]
         }
+    },
+    {
+        "name": "ask_legal",
+        "description": "ให้ Legal Manager AI (Lex) ให้คำปรึกษากฎหมายแรงงาน, PDPA, สัญญาฝึกอบรม, IP content, กฎหมาย KH/LA",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "คำถามหรืองานด้านกฎหมาย เช่น ตรวจสัญญา, ถาม PDPA, เช็คกฎแรงงาน"
+                }
+            },
+            "required": ["task"]
+        }
     }
 ]
 
@@ -179,6 +194,9 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "ask_financial":
         task = tool_input.get("task", "")
         return run_financial_manager(task)
+    elif tool_name == "ask_legal":
+        task = tool_input.get("task", "")
+        return run_legal_manager(task)
     return "ไม่พบ tool นี้"
 
 
