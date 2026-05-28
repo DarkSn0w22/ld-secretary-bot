@@ -14,6 +14,7 @@ import requests
 from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, SHEET_IDS
 from memory import init_db, load_history, save_message, clear_history, get_message_count
 from scheduler import start_scheduler
+from manager_agent import run_manager, run_scheduled_task
 
 app = Flask(__name__)
 
@@ -53,6 +54,20 @@ TOOLS = [
             },
             "required": ["sheet_key"]
         }
+    },
+    {
+        "name": "ask_manager",
+        "description": "ส่งงานที่ซับซ้อนให้ Manager AI (Atlas) วิเคราะห์และประสานงาน เช่น สรุปภาพรวม, วิเคราะห์เชิงลึก, เสนอแผนงาน",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "งานที่ต้องการให้ Manager AI ทำ"
+                }
+            },
+            "required": ["task"]
+        }
     }
 ]
 
@@ -66,6 +81,9 @@ def execute_tool(tool_name, tool_input):
         sheet_key = tool_input.get("sheet_key", "survey")
         names = get_sheet_names(SHEET_IDS.get(sheet_key, SHEET_IDS["survey"]))
         return f"Sheets ใน {sheet_key}: {', '.join(names)}" if names else "ไม่พบข้อมูล"
+    elif tool_name == "ask_manager":
+        task = tool_input.get("task", "")
+        return run_manager(task)
     return "ไม่พบ tool นี้"
 
 
@@ -262,3 +280,9 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
     print(f"Rocket starting on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
+
+
+# =============================================================
+# MANAGER AI INTEGRATION
+# เพิ่ม tools ให้ Rocket สั่งงาน Manager ได้
+# =============================================================
