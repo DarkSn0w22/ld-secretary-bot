@@ -19,6 +19,7 @@ from google_search import google_search
 from trainer_manager_agent import run_trainer_manager
 from reporter_agent import run_reporter
 from reviewer_agent import run_reviewer
+from financial_agent import run_financial_manager
 
 app = Flask(__name__)
 
@@ -132,6 +133,20 @@ TOOLS = [
             },
             "required": ["content"]
         }
+    },
+    {
+        "name": "ask_financial",
+        "description": "ให้ Financial Manager AI (Coin) วิเคราะห์ค่าใช้จ่าย budget, forecast, ROI และรายงานการเงิน L&D",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": "งานที่ต้องการ เช่น สรุปค่าใช้จ่าย, forecast, ROI, แจ้งเตือน budget"
+                }
+            },
+            "required": ["task"]
+        }
     }
 ]
 
@@ -161,6 +176,9 @@ def execute_tool(tool_name, tool_input):
         review_content = tool_input.get("content", "")
         content_type = tool_input.get("content_type", "report")
         return run_reviewer(review_content, content_type)
+    elif tool_name == "ask_financial":
+        task = tool_input.get("task", "")
+        return run_financial_manager(task)
     return "ไม่พบ tool นี้"
 
 

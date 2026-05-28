@@ -95,6 +95,16 @@ def scheduler_loop():
         today = now.date()
         weekday = now.weekday()
 
+        # Coin Budget Check: 08:00 ทุกวัน
+        if (now.hour == 8 and
+                now.minute == 0 and
+                sent_brief_today != today):
+            try:
+                from financial_agent import run_daily_budget_check
+                run_daily_budget_check()
+            except Exception as e:
+                print(f"Coin daily check error: {e}")
+
         # Daily Brief: 10:30
         if (now.hour == BRIEF_HOUR and
                 now.minute == BRIEF_MINUTE and
