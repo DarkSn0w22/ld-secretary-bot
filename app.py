@@ -15,36 +15,22 @@ from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, S
 
 app = Flask(__name__)
 
-# =============================================================
-# CONFIG
-# =============================================================
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "your-channel-secret")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "your-access-token")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "your-anthropic-key")
 
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-# =============================================================
-# CLAUDE TOOLS — ฟังก์ชันที่ให้ Claude เรียกใช้ได้
-# =============================================================
 TOOLS = [
     {
         "name": "get_survey_data",
         "description": "ดึงข้อมูล Training Survey จาก Google Sheets เพื่อดูคะแนนความพึงพอใจการอบรม",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "get_oar_data",
         "description": "ดึงข้อมูล Training Registration (OAR) จาก Google Sheets เพื่อดูการลงทะเบียนอบรม",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "input_schema": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "get_sheet_list",
@@ -54,7 +40,7 @@ TOOLS = [
             "properties": {
                 "sheet_key": {
                     "type": "string",
-                    "description": "ชื่อ sheet: 'survey', 'dashboard', หรือ 'oar'",
+                    "description": "ชื่อ sheet: survey, dashboard, หรือ oar",
                     "enum": ["survey", "dashboard", "oar"]
                 }
             },
@@ -64,8 +50,7 @@ TOOLS = [
 ]
 
 
-def execute_tool(tool_name: str, tool_input: dict) -> str:
-    """รัน tool ที่ Claude เลือกใช้"""
+def execute_tool(tool_name, tool_input):
     if tool_name == "get_survey_data":
         return get_survey_summary()
     elif tool_name == "get_oar_data":
@@ -77,38 +62,27 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
     return "ไม่พบ tool นี้"
 
 
-# =============================================================
-# SYSTEM PROMPT
-# =============================================================
-SECRETARY_PROMPT = """คุณคือ "Secretary" — AI เลขาส่วนตัวของ Peanut (Regional L&D Manager, OWNDAYS Thailand)
+SECRETARY_PROMPT = """คุณคือ "Secretary" AI เลขาส่วนตัวของ Peanut (Regional L&D Manager, OWNDAYS Thailand)
 
-บทบาทของคุณ:
-- เลขาส่วนตัวที่ช่วยจัดการงาน, สรุปข้อมูล, เตือนความจำ, และ draft ข้อความ
-- ตอบเป็นภาษาไทยเป็นหลัก ยกเว้นศัพท์เฉพาะทาง
-- กระชับ ตรงประเด็น เหมาะกับอ่านบน LINE
-- ใช้ emoji พอเหมาะ
+บทบาท:
+- ตอบเป็นภาษาไทย กระชับ เหมาะกับ LINE
+- ห้ามใช้ Markdown เช่น ** หรือ ### เด็ดขาด ใช้ plain text เท่านั้น
+- ใช้ emoji แทน bullet point ได้
+- เมื่อถูกถามข้อมูล Survey หรือ Training ให้ดึงจาก Google Sheets เสมอ
+- เรียงข้อมูลจากใหม่ไปเก่า
 
 ข้อมูลพื้นฐาน:
-- OWNDAYS Thailand มี 73 สาขา, พนักงานหน้าร้าน 400+ คน
-- ทีม L&D มี trainer 18 คน แบ่ง 3 division: Sales, Optical, Optometry
-- Training Manager: Judy (Sales), Jib (Optical), Fair (Optometry)
-- เพื่อนร่วมงาน L&D: Jame
-- โครงสร้างใหม่แบ่งเป็น 5 พื้นที่: Megastore, Metropolitan, North+Central, West+NE, South+Eastern
-- แพลตฟอร์มเรียนรู้: OWNDAYS Connect (od-connect.com)
-
-เมื่อถูกถามเรื่องข้อมูล Survey, Training, หรือ Registration ให้ใช้ tools ดึงข้อมูลจริงจาก Google Sheets เสมอ
+- OWNDAYS Thailand 73 สาขา พนักงาน 400+ คน
+- Trainer 18 คน: Sales (Judy,Pui,Jets,Trin,Nueng,Tonpalm), Optical (Jib,Jajah,Kio,Toy,Kwang,Mark), Optometry (Fair,Benz,Milk,Lookaew)
+- 5 พื้นที่: Megastore, Metropolitan, North+Central, West+NE, South+Eastern
+- แพลตฟอร์ม: OWNDAYS Connect (od-connect.com)
 """
 
-# =============================================================
-# CONVERSATION MEMORY
-# =============================================================
 conversations = {}
 MAX_HISTORY = 20
 
 
-def get_claude_response(user_id: str, message: str) -> str:
-    """ส่งข้อความไป Claude พร้อม tool use"""
-
+def get_claude_response(user_id, message):
     if user_id not in conversations:
         conversations[user_id] = []
 
@@ -120,7 +94,6 @@ def get_claude_response(user_id: str, message: str) -> str:
         conversations[user_id] = history
 
     try:
-        # Loop สำหรับ tool use
         while True:
             response = claude.messages.create(
                 model="claude-sonnet-4-5",
@@ -130,36 +103,21 @@ def get_claude_response(user_id: str, message: str) -> str:
                 messages=history
             )
 
-            # ถ้า Claude หยุดเพราะใช้ tool
             if response.stop_reason == "tool_use":
-                # เพิ่ม assistant message ลง history
-                history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
-
-                # รัน tools ทั้งหมดที่ Claude ขอ
+                history.append({"role": "assistant", "content": response.content})
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
-                        print(f"🔧 Using tool: {block.name}")
+                        print(f"Tool: {block.name}")
                         result = execute_tool(block.name, block.input)
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
                             "content": result
                         })
-
-                # เพิ่ม tool results ลง history
-                history.append({
-                    "role": "user",
-                    "content": tool_results
-                })
-
-                # วนลูปให้ Claude ตอบต่อ
+                history.append({"role": "user", "content": tool_results})
                 continue
 
-            # Claude ตอบแล้ว (end_turn)
             final_text = ""
             for block in response.content:
                 if hasattr(block, "text"):
@@ -169,14 +127,11 @@ def get_claude_response(user_id: str, message: str) -> str:
             return final_text
 
     except Exception as e:
-        print(f"Claude API Error: {e}")
-        return "ขอโทษครับ ระบบมีปัญหาชั่วคราว กรุณาลองใหม่อีกครั้ง 🙏"
+        print(f"Claude Error: {e}")
+        return "ขอโทษครับ ระบบมีปัญหาชั่วคราว กรุณาลองใหม่อีกครั้ง"
 
 
-# =============================================================
-# LINE
-# =============================================================
-def verify_signature(body: str, signature: str) -> bool:
+def verify_signature(body, signature):
     hash = hmac.new(
         LINE_CHANNEL_SECRET.encode("utf-8"),
         body.encode("utf-8"),
@@ -185,7 +140,7 @@ def verify_signature(body: str, signature: str) -> bool:
     return signature == base64.b64encode(hash).decode("utf-8")
 
 
-def reply_message(reply_token: str, text: str):
+def reply_message(reply_token, text):
     messages = []
     while text:
         chunk = text[:5000]
@@ -201,12 +156,9 @@ def reply_message(reply_token: str, text: str):
     requests.post(url, headers=headers, json=payload)
 
 
-# =============================================================
-# ROUTES
-# =============================================================
 @app.route("/", methods=["GET"])
 def health_check():
-    return "LD Secretary Bot v2 is running! 🤖", 200
+    return "LD Secretary Bot v2 is running!", 200
 
 
 @app.route("/webhook", methods=["POST"])
@@ -225,20 +177,19 @@ def webhook():
             user_message = event["message"]["text"]
             reply_token = event["replyToken"]
 
-            print(f"📩 User {user_id[:8]}...: {user_message}")
+            print(f"User {user_id[:8]}...: {user_message}")
 
-# Special command
-if user_message.strip() == "/myid":
-    reply_message(reply_token, f"Your LINE User ID:\n{user_id}")
-else:
-    response = get_claude_response(user_id, user_message)
-    print(f"🤖 Bot: {response[:100]}...")
-   reply_message(reply_token, response)
+            if user_message.strip() == "/myid":
+                reply_message(reply_token, f"Your LINE User ID:\n{user_id}")
+            else:
+                response = get_claude_response(user_id, user_message)
+                print(f"Bot: {response[:100]}...")
+                reply_message(reply_token, response)
 
     return "OK", 200
 
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
-    print(f"🚀 LD Secretary Bot v2 starting on port {port}")
+    print(f"LD Secretary Bot v2 starting on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
