@@ -17,6 +17,7 @@ from scheduler import start_scheduler
 from manager_agent import run_manager, run_scheduled_task
 from google_search import google_search
 from trainer_manager_agent import run_trainer_manager
+from reporter_agent import run_reporter
 
 app = Flask(__name__)
 
@@ -98,6 +99,20 @@ TOOLS = [
             },
             "required": ["task"]
         }
+    },
+    {
+        "name": "ask_reporter",
+        "description": "ให้ Reporter AI (Sage) จัดทำรายงานภาพรวม L&D พร้อม highlight และ recommendation",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "report_type": {
+                    "type": "string",
+                    "description": "ประเภทรายงาน เช่น weekly, monthly, summary"
+                }
+            },
+            "required": []
+        }
     }
 ]
 
@@ -120,6 +135,9 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "ask_trainer_manager":
         task = tool_input.get("task", "")
         return run_trainer_manager(task)
+    elif tool_name == "ask_reporter":
+        report_type = tool_input.get("report_type", "weekly")
+        return run_reporter(report_type)
     return "ไม่พบ tool นี้"
 
 
