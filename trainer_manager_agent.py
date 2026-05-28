@@ -5,7 +5,7 @@ Trainer Manager AI — "Pulse"
 
 import os
 import anthropic
-from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, SHEET_IDS, read_sheet
+from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, SHEET_IDS
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -47,83 +47,20 @@ Program (Q6-10): สื่อ, กิจกรรม, สถานที่, เ
 
 PULSE_TOOLS = [
     {
-        "name": "get_survey_data",
-        "description": "ดึงข้อมูล Survey ทั้งหมด วิเคราะห์คะแนน trainer และ program",
+        "name": "get_all_ld_data",
+        "description": "ดึงข้อมูล Survey + OAR ทั้งหมดมาพร้อมกันในครั้งเดียว ใช้สำหรับวิเคราะห์ trainer, หลักสูตร, และภาพรวม L&D",
         "input_schema": {"type": "object", "properties": {}, "required": []}
-    },
-    {
-        "name": "get_oar_data",
-        "description": "ดึงข้อมูล Training Registration วิเคราะห์จำนวนผู้เข้าอบรมต่อหลักสูตร",
-        "input_schema": {"type": "object", "properties": {}, "required": []}
-    },
-    {
-        "name": "get_survey_sheets",
-        "description": "ดูรายชื่อ sheet ทั้งหมดใน Survey Spreadsheet (แต่ละ sheet = แต่ละหลักสูตร)",
-        "input_schema": {"type": "object", "properties": {}, "required": []}
-    },
-    {
-        "name": "analyze_trainer_performance",
-        "description": "วิเคราะห์ performance ของ trainer แต่ละคน จาก survey score",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "trainer_name": {
-                    "type": "string",
-                    "description": "ชื่อ trainer ที่ต้องการวิเคราะห์ ถ้าไม่ระบุจะวิเคราะห์ทุกคน"
-                }
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "analyze_course_performance",
-        "description": "วิเคราะห์ผลการอบรมของหลักสูตรที่ระบุ",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "course_code": {
-                    "type": "string",
-                    "description": "รหัสหลักสูตร เช่น BOC, MSC, SMOT"
-                }
-            },
-            "required": ["course_code"]
-        }
     }
 ]
 
 
 def execute_pulse_tool(tool_name: str, tool_input: dict) -> str:
-    if tool_name == "get_survey_data":
-        return get_survey_summary()
-
-    elif tool_name == "get_oar_data":
-        return get_oar_summary()
-
-    elif tool_name == "get_survey_sheets":
-        names = get_sheet_names(SHEET_IDS["survey"])
-        if names:
-            return f"หลักสูตรที่มีข้อมูล Survey ({len(names)} หลักสูตร):\n" + "\n".join(names)
-        return "ไม่พบข้อมูล"
-
-    elif tool_name == "analyze_trainer_performance":
-        trainer = tool_input.get("trainer_name", "ทุกคน")
-        survey_data = get_survey_summary()
-        return f"ข้อมูล Survey สำหรับวิเคราะห์ trainer {trainer}:\n{survey_data}"
-
-    elif tool_name == "analyze_course_performance":
-        course = tool_input.get("course_code", "")
-        # ลองดึง sheet ที่ชื่อตรงกับ course code
-        sheet_names = get_sheet_names(SHEET_IDS["survey"])
-        target = next((s for s in sheet_names if course.upper() in s.upper()), None)
-        if target:
-            data = read_sheet(SHEET_IDS["survey"], f"{target}!A1:Z50")
-            if data:
-                result = f"ข้อมูลหลักสูตร {course} (Sheet: {target}):\n"
-                for row in data[:30]:
-                    result += " | ".join(str(c) for c in row) + "\n"
-                return result
-        return f"ไม่พบข้อมูลหลักสูตร {course} ใน Survey Sheets"
-
+    if tool_name == "get_all_ld_data":
+        survey = get_survey_summary()
+        oar = get_oar_summary()
+        sheets = get_sheet_names(SHEET_IDS["survey"])
+        sheet_list = ", ".join(sheets) if sheets else "ไม่พบ"
+        return f"Survey Data:\n{survey}\n\nOAR Data:\n{oar}\n\nAvailable courses: {sheet_list}"
     return "ไม่พบ tool นี้"
 
 
@@ -137,8 +74,9 @@ def run_trainer_manager(task: str, context: str = "") -> str:
 
     messages = [{"role": "user", "content": prompt}]
 
+    max_loops = 3
     try:
-        while True:
+        for loop_count in range(max_loops):
             response = claude.messages.create(
                 model="claude-sonnet-4-5",
                 max_tokens=2048,
