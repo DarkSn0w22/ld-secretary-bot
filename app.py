@@ -6,6 +6,7 @@ LINE Bot + Claude API + Google Sheets + PostgreSQL Memory
 import os
 import json
 import hashlib
+import threading
 import hmac
 import base64
 from flask import Flask, request, abort
@@ -101,7 +102,8 @@ def execute_tool(tool_name, tool_input):
         return run_manager(task)
     elif tool_name == "ask_researcher":
         query = tool_input.get("query", "")
-        return run_researcher(query)
+        # Scout อาจใช้เวลานาน — ส่ง placeholder กลับก่อน แล้วค่อย push ผล
+        return f"Scout กำลังค้นหา: {query}\nผลจะส่งให้ทาง LINE ภายใน 1-2 นาทีครับ"
     return "ไม่พบ tool นี้"
 
 
