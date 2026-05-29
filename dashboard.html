@@ -55,10 +55,14 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 .ntab.on{color:var(--blue);background:var(--panel);border-color:var(--border);
   text-shadow:0 0 8px rgba(79,158,255,.4);}
 
-/* LAYOUT */
-.layout{flex:1;display:grid;grid-template-columns:210px 1fr 270px;min-height:0;overflow:hidden;}
+/* PAGES wrapper */
+.pages{flex:1;display:flex;min-height:0;overflow:hidden;}
+.page{flex:1;min-height:0;overflow:hidden;}
 
-/* ─── LEFT PANEL ─── */
+/* LAYOUT (3-col grid inside a page) */
+.layout{flex:1;display:grid;grid-template-columns:210px 1fr 270px;min-height:0;overflow:hidden;height:100%;}
+
+/* LEFT PANEL */
 .lpanel{
   border-right:1px solid var(--border);background:var(--bg2);
   display:flex;flex-direction:column;overflow:hidden;
@@ -97,7 +101,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 @keyframes bk{0%,100%{opacity:1}50%{opacity:.25}}
 .astate{font-size:9px;color:var(--text3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-/* ─── CENTER ─── */
+/* CENTER */
 .cpanel{display:flex;flex-direction:column;overflow:hidden;position:relative;}
 #oc{display:block;flex-shrink:0;cursor:crosshair;image-rendering:pixelated;}
 
@@ -147,7 +151,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   font-family:'Sarabun',sans-serif;
 }
 
-/* ─── RIGHT PANEL ─── */
+/* RIGHT PANEL */
 .rpanel{
   border-left:1px solid var(--border);background:var(--bg2);
   display:flex;flex-direction:column;overflow-y:auto;
@@ -187,6 +191,61 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   margin:2px;font-family:'Share Tech Mono';
 }
 
+/* AGENT CHAT STREAM */
+.chat-entry{display:flex;gap:8px;font-size:10px;animation:fi .25s ease;padding:3px 0;border-bottom:1px solid rgba(28,40,64,.5);}
+.chat-entry:last-child{border-bottom:none;}
+
+/* SCHEDULE PAGE */
+.sch-row{
+  display:flex;align-items:center;gap:10px;background:var(--panel);
+  border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:8px;
+  flex-wrap:wrap;
+}
+.sch-time{
+  background:var(--bg);border:1px solid var(--border2);border-radius:4px;
+  padding:5px 8px;color:var(--yellow);font-family:'Share Tech Mono';font-size:13px;
+  width:72px;outline:none;
+}
+.sch-days{display:flex;gap:5px;flex-wrap:wrap;}
+.sch-day{
+  padding:3px 7px;border:1px solid var(--border2);border-radius:3px;
+  font-size:9px;cursor:pointer;color:var(--text3);background:var(--bg);transition:.15s;
+}
+.sch-day.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+.sch-agent{
+  background:var(--bg);border:1px solid var(--border2);border-radius:4px;
+  padding:5px 8px;color:var(--text);font-family:'Share Tech Mono';font-size:10px;
+  outline:none;cursor:pointer;
+}
+.sch-task{
+  flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border2);border-radius:4px;
+  padding:5px 8px;color:var(--text);font-family:'Share Tech Mono';font-size:10px;outline:none;
+}
+.sch-task:focus{border-color:var(--blue);}
+.sch-toggle{
+  width:36px;height:20px;border-radius:10px;border:none;cursor:pointer;transition:.2s;
+  position:relative;flex-shrink:0;
+}
+.sch-toggle.on{background:var(--green);}
+.sch-toggle.off{background:var(--border2);}
+.sch-del{
+  background:none;border:1px solid var(--border2);border-radius:4px;color:var(--red);
+  padding:4px 8px;font-size:10px;cursor:pointer;transition:.15s;
+}
+.sch-del:hover{background:rgba(255,92,92,.1);border-color:var(--red);}
+
+/* CONSOLE PAGE sidebar mini */
+.aside-mini{
+  border-right:1px solid var(--border);background:var(--bg2);
+  display:flex;flex-direction:column;overflow:hidden;width:160px;
+}
+.aside-item{
+  display:flex;align-items:center;gap:6px;padding:6px 10px;
+  cursor:pointer;border-bottom:1px solid rgba(28,40,64,.4);transition:.15s;
+}
+.aside-item:hover{background:var(--panel);}
+.aside-item.sel{background:var(--panel2);}
+
 /* scrollbar */
 ::-webkit-scrollbar{width:3px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
@@ -216,81 +275,193 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   </div>
 </div>
 
-<!-- NAV -->
+<!-- NAV (4 tabs, no Agent Chat) -->
 <div class="nav">
   <div class="ntab on" onclick="setTab(this)">🏢 AI Office</div>
   <div class="ntab" onclick="setTab(this)">🤖 Agents</div>
   <div class="ntab" onclick="setTab(this)">💻 Console</div>
   <div class="ntab" onclick="setTab(this)">⏰ Schedule</div>
-  <div class="ntab" onclick="setTab(this);loadAgentLog()">💬 Agent Chat</div>
 </div>
 
-<!-- LAYOUT -->
-<div class="layout">
+<!-- PAGES -->
+<div class="pages">
 
-  <!-- LEFT -->
-  <div class="lpanel">
-    <div class="ph">AI Agents <span class="ph-badge">11 ACTIVE</span></div>
-    <div class="alist" id="alist"></div>
-  </div>
+  <!-- ══════════════════════════════════════════════
+       PAGE: AI Office (default)
+  ══════════════════════════════════════════════ -->
+  <div id="pg-office" class="page" style="display:flex;">
+    <div class="layout">
 
-  <!-- CENTER -->
-  <div class="cpanel">
-    <canvas id="oc"></canvas>
-    <div class="con">
-      <div class="ph" style="flex-shrink:0;">
-        ⚡ System Console
-        <span style="font-size:9px;color:var(--green)">● LIVE</span>
+      <!-- LEFT: agents list -->
+      <div class="lpanel">
+        <div class="ph">AI Agents <span class="ph-badge">12 ACTIVE</span></div>
+        <div class="alist" id="alist"></div>
       </div>
-      <div class="cbody" id="cbody"></div>
-      <div id="rp" class="rp"></div>
-      <div class="cmdbar">
-        <select class="csel" id="tgt">
-          <option value="rocket">🚀 Rocket</option>
-          <option value="atlas">🗺️ Atlas</option>
-          <option value="pulse">💓 Pulse</option>
-          <option value="sage">📋 Sage</option>
-          <option value="guard">🛡️ Guard</option>
-          <option value="coin">💰 Coin</option>
-          <option value="lex">⚖️ Lex</option>
-          <option value="people">👥 People</option>
-          <option value="pixel">🖥️ Pixel</option>
-          <option value="sigma">📈 Sigma</option>
-          <option value="lens">🎨 Lens</option>
-          <option value="rex">🏬 Rex</option>
-        </select>
-        <input class="cinput" id="cmd" placeholder="พิมพ์คำสั่งให้ agent..."
-               onkeydown="if(event.key==='Enter')doSend()"/>
-        <button class="cbtn" onclick="doSend()">▶ RUN</button>
+
+      <!-- CENTER: canvas + embedded agent chat -->
+      <div class="cpanel">
+        <canvas id="oc"></canvas>
+        <!-- Agent Chat replaces System Console on this page -->
+        <div class="con" id="chat-con">
+          <div class="ph" style="flex-shrink:0;">
+            💬 Agent Chat
+            <span id="chat-live" style="font-size:9px;color:var(--green)">● LIVE</span>
+            <span id="chat-count" style="font-size:9px;color:var(--text3);margin-left:8px;"></span>
+          </div>
+          <div class="cbody" id="chat-stream" style="flex:1;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: stats + schedule + detail -->
+      <div class="rpanel">
+        <div class="ph">📊 Quick Stats</div>
+        <div class="sgrid">
+          <div class="sb"><div class="sv" style="color:var(--green)">400+</div><div class="sl">Employees</div></div>
+          <div class="sb"><div class="sv" style="color:var(--purple)">18</div><div class="sl">Trainers</div></div>
+          <div class="sb"><div class="sv" style="color:var(--yellow)">16</div><div class="sl">Courses</div></div>
+          <div class="sb"><div class="sv" style="color:var(--cyan)">5</div><div class="sl">Areas</div></div>
+        </div>
+        <div class="ph">⏰ Scheduled Jobs</div>
+        <div class="sched">
+          <div class="si">
+            <div class="st">09:00</div>
+            <div>
+              <div class="sn">Morning Report</div>
+              <div class="sa">🚀 Rocket — จ-ศ (Coin+People+Sage)</div>
+            </div>
+            <div class="sdot"></div>
+          </div>
+        </div>
+        <div class="ph">🤖 Agent Detail</div>
+        <div class="det" id="det">
+          <div style="color:var(--text3);font-size:10px;text-align:center;padding:20px;">
+            คลิก agent เพื่อดูรายละเอียด
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /pg-office -->
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: Agents
+  ══════════════════════════════════════════════ -->
+  <div id="pg-agents" class="page" style="display:none;flex-direction:column;">
+    <div style="flex:1;overflow-y:auto;padding:16px;background:var(--bg2);">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--blue);
+                  letter-spacing:1px;margin-bottom:14px;">🤖 ALL AGENTS — STATUS OVERVIEW</div>
+      <div id="agent-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+    </div>
+  </div><!-- /pg-agents -->
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: Console
+  ══════════════════════════════════════════════ -->
+  <div id="pg-console" class="page" style="display:none;">
+    <div style="display:flex;height:100%;overflow:hidden;">
+
+      <!-- Mini agents sidebar -->
+      <div class="aside-mini">
+        <div class="ph" style="font-size:9px;">Agents</div>
+        <div style="flex:1;overflow-y:auto;" id="alist2"></div>
+      </div>
+
+      <!-- Console body -->
+      <div class="cpanel" style="flex:1;">
+        <div class="con" style="flex:1;border-top:none;">
+          <div class="ph" style="flex-shrink:0;">
+            ⚡ System Console
+            <span style="font-size:9px;color:var(--green)">● LIVE</span>
+          </div>
+          <div class="cbody" id="cbody"></div>
+          <div id="rp" class="rp"></div>
+          <div class="cmdbar">
+            <select class="csel" id="tgt">
+              <option value="rocket">🚀 Rocket</option>
+              <option value="atlas">🗺️ Atlas</option>
+              <option value="pulse">💓 Pulse</option>
+              <option value="sage">📋 Sage</option>
+              <option value="guard">🛡️ Guard</option>
+              <option value="coin">💰 Coin</option>
+              <option value="lex">⚖️ Lex</option>
+              <option value="people">👥 People</option>
+              <option value="pixel">🖥️ Pixel</option>
+              <option value="sigma">📈 Sigma</option>
+              <option value="lens">🎨 Lens</option>
+              <option value="rex">🏬 Rex</option>
+            </select>
+            <input class="cinput" id="cmd" placeholder="พิมพ์คำสั่งให้ agent..."
+                   onkeydown="if(event.key==='Enter')doSend()"/>
+            <button class="cbtn" onclick="doSend()">▶ RUN</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right panel -->
+      <div class="rpanel" style="width:270px;">
+        <div class="ph">📊 Quick Stats</div>
+        <div class="sgrid">
+          <div class="sb"><div class="sv" style="color:var(--green)">400+</div><div class="sl">Employees</div></div>
+          <div class="sb"><div class="sv" style="color:var(--purple)">18</div><div class="sl">Trainers</div></div>
+          <div class="sb"><div class="sv" style="color:var(--yellow)">16</div><div class="sl">Courses</div></div>
+          <div class="sb"><div class="sv" style="color:var(--cyan)">5</div><div class="sl">Areas</div></div>
+        </div>
+        <div class="ph">🤖 Selected Agent</div>
+        <div class="det" id="det2"><div style="color:var(--text3);font-size:10px;text-align:center;padding:20px;">คลิก agent เพื่อดูรายละเอียด</div></div>
+      </div>
+
+    </div>
+  </div><!-- /pg-console -->
+
+  <!-- ══════════════════════════════════════════════
+       PAGE: Schedule
+  ══════════════════════════════════════════════ -->
+  <div id="pg-schedule" class="page" style="display:none;flex-direction:column;">
+    <div style="flex:1;overflow-y:auto;padding:20px;background:var(--bg2);">
+      <div style="max-width:860px;margin:0 auto;">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;color:var(--blue);letter-spacing:1px;">⏰ SCHEDULED JOBS</div>
+            <div style="font-size:9px;color:var(--text3);margin-top:3px;">กำหนดเวลาและ agent ที่จะทำงานอัตโนมัติ</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div id="sch-status" style="font-size:9px;color:var(--text3);"></div>
+            <button onclick="addScheduleRow()" style="
+              background:var(--panel);border:1px solid var(--border2);color:var(--cyan);
+              padding:6px 12px;border-radius:4px;font-size:11px;cursor:pointer;
+              font-family:'Share Tech Mono';transition:.15s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--border2)'">
+              + ADD JOB
+            </button>
+            <button onclick="saveSchedule()" style="
+              background:var(--blue);border:none;color:#fff;
+              padding:6px 14px;border-radius:4px;font-size:11px;cursor:pointer;
+              font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;transition:.15s;"
+              onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter=''">
+              💾 SAVE
+            </button>
+          </div>
+        </div>
+
+        <!-- Column headers -->
+        <div style="display:flex;gap:10px;padding:0 14px 6px;font-size:8px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;">
+          <div style="width:72px;">Time</div>
+          <div style="width:210px;">Days</div>
+          <div style="width:110px;">Agent</div>
+          <div style="flex:1;">Task</div>
+          <div style="width:36px;">On</div>
+          <div style="width:32px;"></div>
+        </div>
+
+        <!-- Schedule rows injected here -->
+        <div id="sch-rows"></div>
+
       </div>
     </div>
-  </div>
+  </div><!-- /pg-schedule -->
 
-  <!-- RIGHT -->
-  <div class="rpanel">
-    <div class="ph">📊 Quick Stats</div>
-    <div class="sgrid">
-      <div class="sb"><div class="sv" style="color:var(--green)">400+</div><div class="sl">Employees</div></div>
-      <div class="sb"><div class="sv" style="color:var(--purple)">18</div><div class="sl">Trainers</div></div>
-      <div class="sb"><div class="sv" style="color:var(--yellow)">16</div><div class="sl">Courses</div></div>
-      <div class="sb"><div class="sv" style="color:var(--cyan)">5</div><div class="sl">Areas</div></div>
-    </div>
-    <div class="ph">⏰ Scheduled Jobs</div>
-    <div class="sched">
-      <div class="si"><div class="st">08:00</div><div><div class="sn">Budget Alert</div><div class="sa">💰 Coin — ทุกวัน</div></div><div class="sdot"></div></div>
-      <div class="si"><div class="st">09:00</div><div><div class="sn">Weekly Report</div><div class="sa">📋 Sage — จ+พฤ</div></div><div class="sdot"></div></div>
-      <div class="si"><div class="st">09:00</div><div><div class="sn">Probation Check</div><div class="sa">👥 People — จันทร์</div></div><div class="sdot"></div></div>
-      <div class="si"><div class="st">10:30</div><div><div class="sn">Daily Brief</div><div class="sa">🚀 Rocket — ทุกวัน</div></div><div class="sdot"></div></div>
-    </div>
-    <div class="ph">🤖 Agent Detail</div>
-    <div class="det" id="det">
-      <div style="color:var(--text3);font-size:10px;text-align:center;padding:20px;">
-        คลิก agent เพื่อดูรายละเอียด
-      </div>
-    </div>
-  </div>
-
-</div><!-- /layout -->
+</div><!-- /pages -->
 
 <script>
 // Token ฝังจาก server (ว่าง = public mode)
@@ -316,13 +487,37 @@ const AGENTS = [
 ];
 
 // ═══════════════════════════════════════════════════════════════
-//  OFFICE LAYOUT  (isometric-style top-down pixel art)
+//  PAGE ROUTING
+// ═══════════════════════════════════════════════════════════════
+const PAGE_MAP = {
+  '🏢 AI Office': 'pg-office',
+  '🤖 Agents':    'pg-agents',
+  '💻 Console':   'pg-console',
+  '⏰ Schedule':  'pg-schedule',
+};
+
+function setTab(el) {
+  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  const pageId = PAGE_MAP[el.textContent.trim()];
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  if (pageId) {
+    const pg = document.getElementById(pageId);
+    // flex pages need display:flex, others display:block
+    pg.style.display = (pageId === 'pg-office' || pageId === 'pg-agents' || pageId === 'pg-schedule') ? 'flex' : 'block';
+  }
+  // Extra init on first visit
+  if (pageId === 'pg-agents') renderAgentCards();
+  if (pageId === 'pg-schedule') loadSchedule();
+  if (pageId === 'pg-console') renderMiniList();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  OFFICE LAYOUT (isometric-style top-down pixel art)
 // ═══════════════════════════════════════════════════════════════
 const canvas = document.getElementById('oc');
 const ctx = canvas.getContext('2d');
 
-// Desk positions in pixel coords (will be scaled)
-// office is 560 × 280 "design pixels"
 const DW = 560, DH = 280;
 
 const DESK_POSITIONS = [
@@ -336,8 +531,8 @@ const DESK_POSITIONS = [
   {x:280, y:160}, // People
   {x:380, y:160}, // Pixel
   {x:480, y:160}, // Sigma
-  {x:190, y:230}, // Lens — meeting table
-  {x:370, y:230}, // Rex — meeting table (ฝั่งขวา)
+  {x:190, y:230}, // Lens
+  {x:370, y:230}, // Rex
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -350,8 +545,8 @@ const walkers = AGENTS.map((agent, i) => {
     x: dp.x, y: dp.y,
     deskX: dp.x, deskY: dp.y,
     tx: dp.x, ty: dp.y,
-    state: 'sit',      // 'sit' | 'walk' | 'return'
-    dir: 'down',       // 'up'|'down'|'left'|'right'
+    state: 'sit',
+    dir: 'down',
     frame: 0,
     frameTick: 0,
     sitTick: 150 + Math.random()*300,
@@ -365,7 +560,7 @@ const walkers = AGENTS.map((agent, i) => {
 
 let selId = null;
 let taskCount = 0;
-let scaleX = 1, scaleY = 1, offX = 0;
+let scaleX = 1, scaleY = 1;
 
 function resizeCanvas() {
   const cp = canvas.parentElement;
@@ -380,7 +575,7 @@ function resizeCanvas() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DRAW HELPERS  (all coords in design space 560×280)
+//  DRAW HELPERS
 // ═══════════════════════════════════════════════════════════════
 function px(x) { return x * scaleX; }
 function py(y) { return y * scaleY; }
@@ -396,16 +591,13 @@ function strokeRect(x,y,w,h,col,lw=1) {
   ctx.strokeRect(px(x)+.5, py(y)+.5, px(w)-1, py(h)-1);
 }
 
-// ─── DRAW ROOM ───────────────────────────────────────────────
 function drawRoom() {
-  // Floor
   const floorGrad = ctx.createLinearGradient(0,0,0,canvas.height);
   floorGrad.addColorStop(0,'#0b1020');
   floorGrad.addColorStop(1,'#070a14');
   ctx.fillStyle = floorGrad;
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // Floor tiles
   const TW = px(40), TH = py(40);
   for(let x=0;x<canvas.width;x+=TW){
     for(let y=0;y<canvas.height;y+=TH){
@@ -414,13 +606,11 @@ function drawRoom() {
       ctx.fillRect(x,y,TW,TH);
     }
   }
-  // tile lines
   ctx.strokeStyle = 'rgba(79,158,255,0.05)';
   ctx.lineWidth = .5;
   for(let x=0;x<canvas.width;x+=TW){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke(); }
   for(let y=0;y<canvas.height;y+=TH){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke(); }
 
-  // Back wall
   const wallH = py(28);
   const wg = ctx.createLinearGradient(0,0,0,wallH);
   wg.addColorStop(0,'#0c1525'); wg.addColorStop(1,'#080e1a');
@@ -430,7 +620,6 @@ function drawRoom() {
   ctx.lineWidth = 1.5;
   ctx.beginPath();ctx.moveTo(0,wallH);ctx.lineTo(canvas.width,wallH);ctx.stroke();
 
-  // Wall text
   ctx.save();
   ctx.font = `${ps(7)}px 'Press Start 2P'`;
   ctx.fillStyle = 'rgba(79,158,255,0.25)';
@@ -438,16 +627,9 @@ function drawRoom() {
   ctx.fillText('OWNDAYS ACADEMY — L&D THAILAND', canvas.width/2, py(16));
   ctx.restore();
 
-  // Bookshelf right
   drawBookshelf(470, 3, 85, 22);
-
-  // Window left
   drawWindow(5, 3, 55, 22);
-
-  // AC unit top-right
   drawAC(430, 3, 35, 10);
-
-  // Meeting table bottom center
   drawMeetingTable(150, 210, 200, 45);
 }
 
@@ -464,11 +646,9 @@ function drawBookshelf(x,y,w,h) {
 function drawWindow(x,y,w,h) {
   fillRect(x,y,w,h,'#0a1830');
   strokeRect(x,y,w,h,'#1a3a6a');
-  // panes
   const mid = w/2;
   fillRect(x+mid-0.5,y,1,h,'#1a3a6a');
   fillRect(x,y+h/2-0.5,w,1,'#1a3a6a');
-  // sky glow
   ctx.save();
   ctx.globalAlpha=0.15;
   fillRect(x+1,y+1,mid-1.5,h/2-1.5,'#4f9eff');
@@ -480,9 +660,7 @@ function drawWindow(x,y,w,h) {
 function drawAC(x,y,w,h) {
   fillRect(x,y,w,h,'#0e1a2a');
   strokeRect(x,y,w,h,'#1e3a5a');
-  // vents
   for(let i=0;i<5;i++) fillRect(x+3+i*6,y+3,3,h-6,'#0a1420');
-  // indicator
   fillRect(x+w-6,y+2,4,4,'#3ddc84');
   ctx.fillStyle='rgba(61,220,132,.4)';
   ctx.beginPath();
@@ -491,24 +669,19 @@ function drawAC(x,y,w,h) {
 }
 
 function drawMeetingTable(x,y,w,h) {
-  // Shadow
   ctx.save();
   ctx.globalAlpha=0.3;
   fillRect(x+2,y+3,w,h,'#000');
   ctx.restore();
-  // Table surface
   const tg=ctx.createLinearGradient(0,py(y),0,py(y+h));
   tg.addColorStop(0,'#162035'); tg.addColorStop(1,'#0f1828');
   ctx.fillStyle=tg;
   ctx.fillRect(px(x),py(y),px(w),py(h));
   strokeRect(x,y,w,h,'#2a4a70',1);
-  // Laptop
   fillRect(x+20,y+8,30,18,'#0a1020');
   fillRect(x+21,y+9,28,14,'#1a3a6a');
   fillRect(x+22,y+10,26,12,'rgba(79,158,255,.2)');
-  // Coffee cups
   ['#c87941','#a06030'].forEach((c,i)=>{ fillRect(x+w-25+i*14,y+8,10,12,c); fillRect(x+w-24+i*14,y+9,8,8,'rgba(0,0,0,.4)'); });
-  // Label
   ctx.save();
   ctx.font=`${ps(5)}px 'Press Start 2P'`;
   ctx.fillStyle='rgba(79,158,255,.3)';
@@ -517,176 +690,49 @@ function drawMeetingTable(x,y,w,h) {
   ctx.restore();
 }
 
-// ─── DRAW DESK ───────────────────────────────────────────────
 function drawDesk(x,y,agent,occupied) {
-  const dw=54, dh=36;
-  const col = occupied ? agent.color : '#1a2535';
-  // Shadow
-  ctx.save(); ctx.globalAlpha=0.3;
-  fillRect(x-dw/2+2,y-dh/2+3,dw,dh,'#000');
-  ctx.restore();
-  // Surface
+  const dw=54,dh=36,col=occupied?agent.color:'#1a2535';
+  ctx.save();ctx.globalAlpha=0.3;fillRect(x-dw/2+2,y-dh/2+3,dw,dh,'#000');ctx.restore();
   const dg=ctx.createLinearGradient(0,py(y-dh/2),0,py(y+dh/2));
-  dg.addColorStop(0, occupied?'#1e3050':'#151e2d');
-  dg.addColorStop(1, occupied?'#0f1e38':'#0e1520');
-  ctx.fillStyle=dg;
-  ctx.fillRect(px(x-dw/2),py(y-dh/2),px(dw),py(dh));
-  ctx.strokeStyle = occupied ? col : '#1e2d45';
-  ctx.lineWidth = occupied ? ps(1.2) : ps(.7);
+  dg.addColorStop(0,occupied?'#1e3050':'#151e2d');dg.addColorStop(1,occupied?'#0f1e38':'#0e1520');
+  ctx.fillStyle=dg;ctx.fillRect(px(x-dw/2),py(y-dh/2),px(dw),py(dh));
+  ctx.strokeStyle=occupied?col:'#1e2d45';ctx.lineWidth=occupied?ps(1.2):ps(.7);
   ctx.strokeRect(px(x-dw/2)+.5,py(y-dh/2)+.5,px(dw)-1,py(dh)-1);
-
-  // Glow when occupied
-  if(occupied){
-    ctx.save();
-    ctx.globalAlpha=0.12;
-    ctx.shadowBlur=px(12);
-    ctx.shadowColor=col;
-    ctx.fillStyle=col;
-    ctx.fillRect(px(x-dw/2),py(y-dh/2),px(dw),py(dh));
-    ctx.restore();
-  }
-
-  // Monitor
-  const mx=x-9, my=y-dh/2+3;
-  fillRect(mx,my,20,14,'#060a12');
-  fillRect(mx+1,my+1,18,10, occupied?'#0f2a50':'#080f1c');
-  if(occupied){
-    // screen content lines
-    for(let i=0;i<4;i++) fillRect(mx+2,my+2+i*2,14,1,`rgba(79,158,255,${0.6-i*.12})`);
-    // blinking cursor
-    if(Math.floor(Date.now()/500)%2===0) fillRect(mx+2,my+2,2,1,'rgba(79,158,255,.9)');
-  }
-  // monitor stand
-  fillRect(x-3,my+14,4,4,'#101820');
-  fillRect(x-7,my+17,12,3,'#101820');
-
-  // Keyboard
-  fillRect(x-dw/2+4,y+2,dw-8,6,'#0e1824');
-  strokeRect(x-dw/2+4,y+2,dw-8,6,'#1a2a3a',.7);
-  for(let i=0;i<5;i++) for(let j=0;j<12;j++)
-    fillRect(x-dw/2+5+j*3.5,y+3+i*0.8,2.5,.6,'rgba(79,158,255,.08)');
-
-  // Coffee
-  fillRect(x+dw/2-14,y-4,9,10,'#8b5020');
-  fillRect(x+dw/2-13,y-3,7,6,'rgba(0,0,0,.5)');
-  // steam
-  if(occupied){
-    ctx.save();
-    ctx.globalAlpha=0.3;
-    ctx.strokeStyle='#aaa';
-    ctx.lineWidth=ps(.7);
-    [0,2].forEach(o=>{
-      ctx.beginPath();
-      ctx.moveTo(px(x+dw/2-10+o),py(y-5));
-      ctx.quadraticCurveTo(px(x+dw/2-8+o),py(y-8),px(x+dw/2-10+o),py(y-10));
-      ctx.stroke();
-    });
-    ctx.restore();
-  }
-
-  // Name tag
-  ctx.save();
-  ctx.font = `bold ${ps(4.5)}px 'Press Start 2P'`;
-  ctx.fillStyle = occupied ? col : 'rgba(255,255,255,.15)';
-  ctx.textAlign='center';
-  ctx.fillText(agent.name, px(x), py(y+dh/2-3));
-  ctx.restore();
+  if(occupied){ctx.save();ctx.globalAlpha=0.12;ctx.shadowBlur=px(12);ctx.shadowColor=col;ctx.fillStyle=col;ctx.fillRect(px(x-dw/2),py(y-dh/2),px(dw),py(dh));ctx.restore();}
+  const mx=x-9,my=y-dh/2+3;
+  fillRect(mx,my,20,14,'#060a12');fillRect(mx+1,my+1,18,10,occupied?'#0f2a50':'#080f1c');
+  if(occupied){for(let i=0;i<4;i++)fillRect(mx+2,my+2+i*2,14,1,`rgba(79,158,255,${0.6-i*.12})`);if(Math.floor(Date.now()/500)%2===0)fillRect(mx+2,my+2,2,1,'rgba(79,158,255,.9)');}
+  fillRect(x-3,my+14,4,4,'#101820');fillRect(x-7,my+17,12,3,'#101820');
+  fillRect(x-dw/2+4,y+2,dw-8,6,'#0e1824');strokeRect(x-dw/2+4,y+2,dw-8,6,'#1a2a3a',.7);
+  for(let i=0;i<5;i++)for(let j=0;j<12;j++)fillRect(x-dw/2+5+j*3.5,y+3+i*0.8,2.5,.6,'rgba(79,158,255,.08)');
+  fillRect(x+dw/2-14,y-4,9,10,'#8b5020');fillRect(x+dw/2-13,y-3,7,6,'rgba(0,0,0,.5)');
+  if(occupied){ctx.save();ctx.globalAlpha=0.3;ctx.strokeStyle='#aaa';ctx.lineWidth=ps(.7);[0,2].forEach(o=>{ctx.beginPath();ctx.moveTo(px(x+dw/2-10+o),py(y-5));ctx.quadraticCurveTo(px(x+dw/2-8+o),py(y-8),px(x+dw/2-10+o),py(y-10));ctx.stroke();});ctx.restore();}
+  ctx.save();ctx.font=`bold ${ps(4.5)}px 'Press Start 2P'`;ctx.fillStyle=occupied?col:'rgba(255,255,255,.15)';ctx.textAlign='center';ctx.fillText(agent.name,px(x),py(y+dh/2-3));ctx.restore();
 }
 
-// ─── DRAW CHARACTER ──────────────────────────────────────────
 function drawChar(w) {
-  const {x,y,agent,frame,dir,state,busy} = w;
-  const sc = ps(1);
-  const moving = state !== 'sit';
-
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
-
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,.35)';
-  ctx.beginPath();
-  ctx.ellipse(px(x), py(y)+ps(12), ps(7), ps(2.5), 0, 0, Math.PI*2);
-  ctx.fill();
-
-  // Legs
-  const legSwing = moving ? (frame%2===0 ? ps(3) : -ps(3)) : 0;
-  ctx.fillStyle = '#1a2535';
-  // left leg
-  ctx.fillRect(px(x)-ps(5), py(y)+ps(2), ps(4), ps(7) + legSwing);
-  // right leg
-  ctx.fillRect(px(x)+ps(1), py(y)+ps(2), ps(4), ps(7) - legSwing);
-  // shoes
-  ctx.fillStyle = '#0a0f1a';
-  ctx.fillRect(px(x)-ps(6), py(y)+ps(7)+legSwing, ps(5), ps(3));
-  ctx.fillRect(px(x)+ps(1), py(y)+ps(7)-legSwing, ps(5), ps(3));
-
-  // Body
-  const bg = ctx.createLinearGradient(0,py(y)-ps(8),0,py(y)+ps(4));
-  bg.addColorStop(0, agent.bodyCol);
-  bg.addColorStop(1, shadeColor(agent.bodyCol,-30));
-  ctx.fillStyle = bg;
-  ctx.fillRect(px(x)-ps(6), py(y)-ps(8), ps(12), ps(12));
-  // collar
-  ctx.fillStyle = 'rgba(255,255,255,.15)';
-  ctx.fillRect(px(x)-ps(2), py(y)-ps(8), ps(4), ps(3));
-
-  // Arms
-  const armSwing = moving ? (frame%2===0 ? ps(2.5) : -ps(2.5)) : 0;
-  ctx.fillStyle = agent.bodyCol;
-  ctx.fillRect(px(x)-ps(10), py(y)-ps(6)+armSwing, ps(4), ps(8));
-  ctx.fillRect(px(x)+ps(6), py(y)-ps(6)-armSwing, ps(4), ps(8));
-  // hands
-  ctx.fillStyle = '#f5c9a0';
-  ctx.fillRect(px(x)-ps(10), py(y)+ps(1)+armSwing, ps(4), ps(4));
-  ctx.fillRect(px(x)+ps(6), py(y)+ps(1)-armSwing, ps(4), ps(4));
-
-  // Neck
-  ctx.fillStyle = '#f5c9a0';
-  ctx.fillRect(px(x)-ps(2), py(y)-ps(10), ps(4), ps(3));
-
-  // Head
-  ctx.fillStyle = '#f5c9a0';
-  ctx.fillRect(px(x)-ps(6), py(y)-ps(20), ps(12), ps(12));
-  // Hair
-  ctx.fillStyle = agent.hairCol;
-  ctx.fillRect(px(x)-ps(6), py(y)-ps(20), ps(12), ps(4));
-  ctx.fillRect(px(x)-ps(7), py(y)-ps(20), ps(2), ps(8)); // side
-
-  // Eyes (only if facing camera)
-  if(dir !== 'up') {
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(px(x)-ps(4), py(y)-ps(15), ps(2), ps(2.5));
-    ctx.fillRect(px(x)+ps(2), py(y)-ps(15), ps(2), ps(2.5));
-    // gleam
-    ctx.fillStyle = 'rgba(255,255,255,.6)';
-    ctx.fillRect(px(x)-ps(3.5), py(y)-ps(15), ps(1), ps(1));
-    ctx.fillRect(px(x)+ps(2.5), py(y)-ps(15), ps(1), ps(1));
-    // mouth
-    ctx.fillStyle = busy ? '#ff9070' : '#c87070';
-    ctx.fillRect(px(x)-ps(1.5), py(y)-ps(11), ps(3), ps(1));
+  const {x,y,agent,frame,dir,state,busy}=w, moving=state!=='sit';
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(px(x),py(y)+ps(12),ps(7),ps(2.5),0,0,Math.PI*2);ctx.fill();
+  const ls=moving?(frame%2===0?ps(3):-ps(3)):0;
+  ctx.fillStyle='#1a2535';ctx.fillRect(px(x)-ps(5),py(y)+ps(2),ps(4),ps(7)+ls);ctx.fillRect(px(x)+ps(1),py(y)+ps(2),ps(4),ps(7)-ls);
+  ctx.fillStyle='#0a0f1a';ctx.fillRect(px(x)-ps(6),py(y)+ps(7)+ls,ps(5),ps(3));ctx.fillRect(px(x)+ps(1),py(y)+ps(7)-ls,ps(5),ps(3));
+  const bg2=ctx.createLinearGradient(0,py(y)-ps(8),0,py(y)+ps(4));bg2.addColorStop(0,agent.bodyCol);bg2.addColorStop(1,shadeColor(agent.bodyCol,-30));
+  ctx.fillStyle=bg2;ctx.fillRect(px(x)-ps(6),py(y)-ps(8),ps(12),ps(12));
+  ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(px(x)-ps(2),py(y)-ps(8),ps(4),ps(3));
+  const as=moving?(frame%2===0?ps(2.5):-ps(2.5)):0;
+  ctx.fillStyle=agent.bodyCol;ctx.fillRect(px(x)-ps(10),py(y)-ps(6)+as,ps(4),ps(8));ctx.fillRect(px(x)+ps(6),py(y)-ps(6)-as,ps(4),ps(8));
+  ctx.fillStyle='#f5c9a0';ctx.fillRect(px(x)-ps(10),py(y)+ps(1)+as,ps(4),ps(4));ctx.fillRect(px(x)+ps(6),py(y)+ps(1)-as,ps(4),ps(4));
+  ctx.fillRect(px(x)-ps(2),py(y)-ps(10),ps(4),ps(3));ctx.fillRect(px(x)-ps(6),py(y)-ps(20),ps(12),ps(12));
+  ctx.fillStyle=agent.hairCol;ctx.fillRect(px(x)-ps(6),py(y)-ps(20),ps(12),ps(4));ctx.fillRect(px(x)-ps(7),py(y)-ps(20),ps(2),ps(8));
+  if(dir!=='up'){
+    ctx.fillStyle='#0a0a1a';ctx.fillRect(px(x)-ps(4),py(y)-ps(15),ps(2),ps(2.5));ctx.fillRect(px(x)+ps(2),py(y)-ps(15),ps(2),ps(2.5));
+    ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillRect(px(x)-ps(3.5),py(y)-ps(15),ps(1),ps(1));ctx.fillRect(px(x)+ps(2.5),py(y)-ps(15),ps(1),ps(1));
+    ctx.fillStyle=busy?'#ff9070':'#c87070';ctx.fillRect(px(x)-ps(1.5),py(y)-ps(11),ps(3),ps(1));
   }
-
-  // Emoji badge (floating above head)
-  ctx.font = `${ps(10)}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  // bounce when busy
-  const bounce = busy ? Math.sin(Date.now()/200)*ps(1.5) : 0;
-  ctx.fillText(agent.em, px(x), py(y)-ps(26) + bounce);
-
-  // Busy glow
-  if(busy) {
-    ctx.save();
-    ctx.globalAlpha = 0.15 + 0.1*Math.sin(Date.now()/300);
-    ctx.shadowBlur = ps(20);
-    ctx.shadowColor = agent.color;
-    ctx.fillStyle = agent.color;
-    ctx.beginPath();
-    ctx.arc(px(x), py(y)-ps(8), ps(12), 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  }
-
+  ctx.font=`${ps(10)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+  const bounce=busy?Math.sin(Date.now()/200)*ps(1.5):0;ctx.fillText(agent.em,px(x),py(y)-ps(26)+bounce);
+  if(busy){ctx.save();ctx.globalAlpha=0.15+0.1*Math.sin(Date.now()/300);ctx.shadowBlur=ps(20);ctx.shadowColor=agent.color;ctx.fillStyle=agent.color;ctx.beginPath();ctx.arc(px(x),py(y)-ps(8),ps(12),0,Math.PI*2);ctx.fill();ctx.restore();}
   ctx.restore();
 }
 
@@ -698,7 +744,6 @@ function shadeColor(col, pct) {
   } catch(e){ return col; }
 }
 
-// ─── DRAW SPEECH BUBBLE ──────────────────────────────────────
 function drawBubble(x, y, text, color) {
   if(!text) return;
   ctx.save();
@@ -709,12 +754,8 @@ function drawBubble(x, y, text, color) {
   const bw = tw + pad*2, bh = fs + pad*2;
   const bx = px(x) - bw/2;
   const by = py(y) - ps(42) - bh;
-
-  // Shadow
   ctx.shadowBlur = ps(8);
   ctx.shadowColor = color;
-
-  // Box
   ctx.fillStyle = 'rgba(6,8,16,.95)';
   ctx.beginPath();
   ctx.roundRect(bx, by, bw, bh, ps(3));
@@ -722,8 +763,6 @@ function drawBubble(x, y, text, color) {
   ctx.strokeStyle = color;
   ctx.lineWidth = ps(.8);
   ctx.stroke();
-
-  // Tail
   ctx.beginPath();
   ctx.moveTo(px(x)-ps(4), by+bh);
   ctx.lineTo(px(x), by+bh+ps(5));
@@ -733,8 +772,6 @@ function drawBubble(x, y, text, color) {
   ctx.strokeStyle = color;
   ctx.lineWidth = ps(.8);
   ctx.stroke();
-
-  // Text
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -758,8 +795,7 @@ const WANDER_PHRASES = [
   '☕ coffee break','🚶 stretch time','💬 chatting','🎯 wander mode',
 ];
 
-function randomWanderTarget(exclude) {
-  // Pick somewhere not too close to current pos
+function randomWanderTarget() {
   const margin = 40;
   return {
     tx: margin + Math.random()*(DW - margin*2),
@@ -769,97 +805,27 @@ function randomWanderTarget(exclude) {
 
 let lastTime = 0;
 function update(ts) {
-  const dt = Math.min(ts - lastTime, 50); // cap at 50ms
-  lastTime = ts;
-
+  const dt = Math.min(ts - lastTime, 50); lastTime = ts;
   walkers.forEach(w => {
-    // Frame animation
-    w.frameTick += dt;
-    if(w.frameTick > 140) { w.frame++; w.frameTick = 0; }
-
-    // Bubble timer
-    if(w.bubbleTick > 0) {
-      w.bubbleTick -= dt;
-      if(w.bubbleTick <= 0) { w.bubble = ''; }
-    }
-
-    if(w.busy) {
-      // Busy: stay at desk, show working bubble occasionally
-      w.state = 'sit';
-      if(Math.random() < 0.002) {
-        w.bubble = BUSY_LINES[Math.floor(Math.random()*BUSY_LINES.length)];
-        w.bubbleTick = 1800;
-      }
-      return;
-    }
-
-    if(w.state === 'sit') {
+    w.frameTick += dt; if(w.frameTick > 140) { w.frame++; w.frameTick = 0; }
+    if(w.bubbleTick > 0) { w.bubbleTick -= dt; if(w.bubbleTick <= 0) w.bubble = ''; }
+    if(w.busy) { w.state='sit'; if(Math.random()<0.002){w.bubble=BUSY_LINES[Math.floor(Math.random()*BUSY_LINES.length)];w.bubbleTick=1800;} return; }
+    if(w.state==='sit') {
       w.sitTick -= dt;
       if(w.sitTick <= 0) {
-        // Decide: wander or stay
-        if(Math.random() < 0.35) {
-          const tgt = randomWanderTarget();
-          w.tx = tgt.tx; w.ty = tgt.ty;
-          w.state = 'walk';
-          w.walkTick = 200 + Math.random()*400;
-          w.bubble = WANDER_PHRASES[Math.floor(Math.random()*WANDER_PHRASES.length)];
-          w.bubbleTick = 2500;
-        } else {
-          w.sitTick = 200 + Math.random()*400;
-          // show idle bubble
-          if(Math.random()<0.3){
-            w.bubble = IDLE_LINES[Math.floor(Math.random()*IDLE_LINES.length)];
-            w.bubbleTick = 2000;
-          }
-        }
+        if(Math.random()<0.35) { const t=randomWanderTarget(); w.tx=t.tx; w.ty=t.ty; w.state='walk'; w.walkTick=200+Math.random()*400; w.bubble=WANDER_PHRASES[Math.floor(Math.random()*WANDER_PHRASES.length)]; w.bubbleTick=2500; }
+        else { w.sitTick=200+Math.random()*400; if(Math.random()<0.3){w.bubble=IDLE_LINES[Math.floor(Math.random()*IDLE_LINES.length)];w.bubbleTick=2000;} }
       }
     }
-
-    if(w.state === 'walk') {
-      const dx = w.tx - w.x, dy = w.ty - w.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const speed = 0.065 * dt; // design-pixels per ms
-
-      if(dist < speed + 1) {
-        w.x = w.tx; w.y = w.ty;
-        w.walkTick -= dt;
-        if(w.walkTick <= 0) {
-          // Return to desk or pick new wander spot
-          if(Math.random() < 0.55) {
-            w.tx = w.deskX; w.ty = w.deskY;
-            w.state = 'return';
-          } else {
-            const tgt = randomWanderTarget();
-            w.tx = tgt.tx; w.ty = tgt.ty;
-            w.walkTick = 150 + Math.random()*300;
-          }
-        }
-      } else {
-        w.x += (dx/dist)*speed;
-        w.y += (dy/dist)*speed;
-        // Direction for sprite
-        if(Math.abs(dx) > Math.abs(dy)) w.dir = dx>0 ? 'right' : 'left';
-        else w.dir = dy>0 ? 'down' : 'up';
-      }
+    if(w.state==='walk') {
+      const dx=w.tx-w.x, dy=w.ty-w.y, dist=Math.sqrt(dx*dx+dy*dy), speed=0.065*dt;
+      if(dist<speed+1) { w.x=w.tx; w.y=w.ty; w.walkTick-=dt; if(w.walkTick<=0){ if(Math.random()<0.55){w.tx=w.deskX;w.ty=w.deskY;w.state='return';}else{const t=randomWanderTarget();w.tx=t.tx;w.ty=t.ty;w.walkTick=150+Math.random()*300;} } }
+      else { w.x+=(dx/dist)*speed; w.y+=(dy/dist)*speed; if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up'; }
     }
-
-    if(w.state === 'return') {
-      const dx = w.deskX - w.x, dy = w.deskY - w.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const speed = 0.08 * dt;
-      if(dist < speed + 1) {
-        w.x = w.deskX; w.y = w.deskY;
-        w.state = 'sit';
-        w.sitTick = 250 + Math.random()*500;
-        w.dir = 'down';
-        w.bubble = IDLE_LINES[Math.floor(Math.random()*IDLE_LINES.length)];
-        w.bubbleTick = 2200;
-      } else {
-        w.x += (dx/dist)*speed;
-        w.y += (dy/dist)*speed;
-        if(Math.abs(dx) > Math.abs(dy)) w.dir = dx>0 ? 'right' : 'left';
-        else w.dir = dy>0 ? 'down' : 'up';
-      }
+    if(w.state==='return') {
+      const dx=w.deskX-w.x, dy=w.deskY-w.y, dist=Math.sqrt(dx*dx+dy*dy), speed=0.08*dt;
+      if(dist<speed+1) { w.x=w.deskX; w.y=w.deskY; w.state='sit'; w.sitTick=250+Math.random()*500; w.dir='down'; w.bubble=IDLE_LINES[Math.floor(Math.random()*IDLE_LINES.length)]; w.bubbleTick=2200; }
+      else { w.x+=(dx/dist)*speed; w.y+=(dy/dist)*speed; if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up'; }
     }
   });
 }
@@ -870,26 +836,18 @@ function update(ts) {
 function render(ts) {
   resizeCanvas();
   update(ts);
-
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawRoom();
-
-  // Draw desks
   AGENTS.forEach((agent, i) => {
     const dp = DESK_POSITIONS[i];
     const w = walkers[i];
-    const occupied = w.state === 'sit';
-    drawDesk(dp.x, dp.y, agent, occupied);
+    drawDesk(dp.x, dp.y, agent, w.state === 'sit');
   });
-
-  // Draw characters sorted by Y (depth)
   const sorted = [...walkers].sort((a,b) => a.y - b.y);
   sorted.forEach(w => {
     drawChar(w);
     if(w.bubble) drawBubble(w.x, w.y, w.bubble, w.agent.color);
   });
-
-  // Selection ring
   if(selId) {
     const w = walkers.find(x=>x.agent.id===selId);
     if(w) {
@@ -904,23 +862,19 @@ function render(ts) {
       ctx.restore();
     }
   }
-
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
 
 // ═══════════════════════════════════════════════════════════════
-//  CANVAS CLICK → select agent
+//  CANVAS CLICK
 // ═══════════════════════════════════════════════════════════════
 canvas.addEventListener('click', e => {
   const rect = canvas.getBoundingClientRect();
   const mx = (e.clientX-rect.left) / scaleX;
   const my = (e.clientY-rect.top) / scaleY;
   let best=null, bd=999;
-  walkers.forEach(w => {
-    const d = Math.hypot(w.x-mx, w.y-my);
-    if(d<bd){ bd=d; best=w; }
-  });
+  walkers.forEach(w => { const d = Math.hypot(w.x-mx, w.y-my); if(d<bd){ bd=d; best=w; } });
   if(best && bd < 28) {
     selectAgent(best.agent.id);
     best.bubble = `Hi! I'm ${best.agent.name} 👋`;
@@ -933,6 +887,7 @@ canvas.addEventListener('click', e => {
 // ═══════════════════════════════════════════════════════════════
 function renderList() {
   const el = document.getElementById('alist');
+  if(!el) return;
   el.innerHTML = AGENTS.map(a => {
     const w = walkers.find(x=>x.agent.id===a.id);
     const st = w.busy ? 'bz' : w.state==='sit' ? 'on' : 'wk';
@@ -951,11 +906,28 @@ function renderList() {
   }).join('');
 }
 
+function renderMiniList() {
+  const el = document.getElementById('alist2');
+  if(!el) return;
+  el.innerHTML = AGENTS.map(a => {
+    const w = walkers.find(x=>x.agent.id===a.id);
+    const st = w.busy ? 'bz' : w.state==='sit' ? 'on' : 'wk';
+    return `<div class="aside-item ${selId===a.id?'sel':''}" onclick="selectAgent('${a.id}');renderMiniList()">
+      <span style="font-size:13px;">${a.em}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;color:${a.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.name}</div>
+      </div>
+      <div class="adot ${st}"></div>
+    </div>`;
+  }).join('');
+}
+
 function selectAgent(id) {
   selId = id;
-  document.getElementById('tgt').value = id;
+  const tgt = document.getElementById('tgt');
+  if(tgt) tgt.value = id;
   const a = AGENTS.find(x=>x.id===id);
-  document.getElementById('det').innerHTML = `
+  const detHtml = `
     <div class="dhead">
       <div class="dem">${a.em}</div>
       <div>
@@ -967,6 +939,10 @@ function selectAgent(id) {
       <div style="font-size:8px;color:var(--text3);margin-bottom:5px;font-family:'Share Tech Mono'">CAPABILITIES</div>
       ${a.tools.map(t=>`<span class="dtag">${t}</span>`).join('')}
     </div>`;
+  const det = document.getElementById('det');
+  if(det) det.innerHTML = detHtml;
+  const det2 = document.getElementById('det2');
+  if(det2) det2.innerHTML = detHtml;
   renderList();
 }
 
@@ -980,6 +956,7 @@ function addLog(agentId, msg, type='info') {
   el.className = `cline ${type}`;
   el.innerHTML = `<span class="ct">[${t}]</span><span class="ca">${a.em}${a.name}</span><span class="cm">${msg}</span>`;
   const b = document.getElementById('cbody');
+  if(!b) return;
   b.appendChild(el);
   b.scrollTop = b.scrollHeight;
   while(b.children.length > 120) b.removeChild(b.firstChild);
@@ -993,19 +970,14 @@ async function doSend() {
   const agentId = document.getElementById('tgt').value;
   if(!task) return;
   document.getElementById('cmd').value = '';
-
   taskCount++;
   document.getElementById('htsk').textContent = taskCount;
-
   const w = walkers.find(x=>x.agent.id===agentId);
   if(w){ w.busy=true; w.state='sit'; w.bubble='working...'; w.bubbleTick=99999; }
-
   addLog(agentId, `Task: "${task.substring(0,45)}..."`, 'info');
-
   const rp = document.getElementById('rp');
   rp.style.display='block';
   rp.innerHTML = `<span style="color:var(--text3)">⚡ Processing...</span>`;
-
   try {
     const res = await fetch('/api/agent',{
       method:'POST', headers:{'Content-Type':'application/json', ...AUTH_HEADERS},
@@ -1025,7 +997,7 @@ async function doSend() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CLOCK + UTILS
+//  CLOCK
 // ═══════════════════════════════════════════════════════════════
 function tick() {
   const d = new Date(new Date().toLocaleString('en',{timeZone:'Asia/Bangkok'}));
@@ -1035,16 +1007,11 @@ function tick() {
 }
 setInterval(tick,1000); tick();
 
-function setTab(el) {
-  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
-  el.classList.add('on');
-}
-
 async function ping() {
   try {
     const r = await fetch('/api/ping', {headers: AUTH_HEADERS});
     if(!r.ok) throw new Error('unauthorized');
-    document.getElementById('hon').textContent='11';
+    document.getElementById('hon').textContent='12';
     document.getElementById('hon').style.color='var(--green)';
   } catch {
     document.getElementById('hon').textContent='?';
@@ -1055,17 +1022,17 @@ ping(); setInterval(ping,30000);
 
 // Boot log sequence
 [
-  ['rocket','System initialized — OWNDAYS AI Office v1 ✓','ok'],
+  ['rocket','System initialized — OWNDAYS AI Office v2 ✓','ok'],
   ['atlas','Dashboard API connection established','ok'],
   ['coin','Budget monitoring active — threshold 80%','info'],
   ['people','Employee Master Sheet linked — 400+ records','info'],
   ['pixel','od-connect.com monitoring started','info'],
-  ['sage','Scheduler ready — Mon+Thu 09:00 report','info'],
+  ['sage','Scheduler ready — Mon-Fri 09:00 Morning Report','info'],
   ['sigma','Data analytics engine online','info'],
   ['lens','Content creator ready','info'],
   ['guard','QA system standing by','info'],
   ['lex','Legal AI consultation ready','info'],
-  ['rocket','All 11 agents online ✓ — AI Office is live 🚀','ok'],
+  ['rocket','All 12 agents online ✓ — AI Office is live 🚀','ok'],
 ].forEach(([a,m,t],i)=>setTimeout(()=>addLog(a,m,t),i*450+200));
 
 // Ambient activity
@@ -1074,10 +1041,7 @@ setInterval(()=>{
   const msgs=['checking KPI metrics','reviewing training data','monitoring performance','scanning dashboard'];
   if(Math.random()<0.25){
     const w=walkers.find(x=>x.agent.id===a.id);
-    if(w&&!w.busy&&w.state==='sit'){
-      w.bubble=msgs[Math.floor(Math.random()*msgs.length)];
-      w.bubbleTick=2200;
-    }
+    if(w&&!w.busy&&w.state==='sit'){ w.bubble=msgs[Math.floor(Math.random()*msgs.length)]; w.bubbleTick=2200; }
   }
 },5000);
 
@@ -1086,143 +1050,211 @@ renderList();
 setInterval(renderList, 1500);
 selectAgent('rocket');
 
-// ─────────────────────────────────────────────
-// 💬 AGENT CHAT LOG
-// ─────────────────────────────────────────────
-let agentLogSince = 0;
-let agentLogInterval = null;
-let agentLogPanel = null;
-
-const AGENT_COLORS_JS = {
-  rocket:'#4f9eff',atlas:'#a78bfa',pulse:'#3ddc84',sage:'#ffd166',
-  guard:'#ff5c5c',coin:'#fb923c',lex:'#22d3ee',people:'#f472b6',
-  pixel:'#86efac',sigma:'#e879f9',lens:'#fbbf24',rex:'#f87171',
-  scheduler:'#64748b',user:'#94a3b8',system:'#475569',dashboard:'#4f9eff'
+// ═══════════════════════════════════════════════════════════════
+//  AGENT CHAT — embedded, polls /api/agent-log every 3s
+// ═══════════════════════════════════════════════════════════════
+const AGENT_COLORS = {
+  rocket:'#4f9eff', atlas:'#a78bfa', pulse:'#3ddc84', sage:'#ffd166',
+  guard:'#ff5c5c',  coin:'#fb923c',  lex:'#22d3ee',   people:'#f472b6',
+  pixel:'#38bdf8',  sigma:'#4ade80', lens:'#f9a8d4',   rex:'#f97316',
+  scheduler:'#64748b', user:'#94a3b8', system:'#475569', dashboard:'#4f9eff',
 };
 
 function agentColor(name) {
-  return AGENT_COLORS_JS[(name||'').toLowerCase()] || '#94a3b8';
-}
-
-function renderAgentLogPanel() {
-  if (agentLogPanel) return;
-  // สร้าง overlay panel
-  agentLogPanel = document.createElement('div');
-  agentLogPanel.id = 'agent-log-panel';
-  agentLogPanel.style.cssText = `
-    position:fixed;inset:0;z-index:999;background:rgba(6,8,16,.96);
-    display:flex;flex-direction:column;font-family:'Share Tech Mono',monospace;
-  `;
-  agentLogPanel.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;
-      padding:10px 18px;background:#101422;border-bottom:2px solid #1a3060;flex-shrink:0;">
-      <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;
-        color:#4f9eff;letter-spacing:1px;">💬 AGENT CHAT LOG</div>
-      <div style="display:flex;gap:10px;align-items:center;">
-        <div id="log-count" style="font-size:9px;color:#6080b0;"></div>
-        <button onclick="clearAgentLog()" style="
-          background:#1c2840;border:1px solid #273a58;color:#ff5c5c;
-          padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer;
-          font-family:'Share Tech Mono';letter-spacing:.5px;">CLEAR</button>
-        <button onclick="closeAgentLog()" style="
-          background:#1c2840;border:1px solid #273a58;color:#94a3b8;
-          padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer;
-          font-family:'Share Tech Mono';letter-spacing:.5px;">✕ CLOSE</button>
-      </div>
-    </div>
-    <div id="log-stream" style="
-      flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px;
-    "></div>
-    <div style="flex-shrink:0;padding:8px 16px;background:#0b0d18;border-top:1px solid #1c2840;
-      font-size:9px;color:#304060;display:flex;gap:16px;">
-      <span>🔄 อัพเดตทุก 3 วินาที</span>
-      <span>📌 แสดง 100 รายการล่าสุด</span>
-    </div>
-  `;
-  document.body.appendChild(agentLogPanel);
-}
-
-function renderLogEntry(entry) {
-  const fromColor = agentColor(entry.from);
-  const toColor   = agentColor(entry.to);
-  const statusColor = entry.status === 'error' ? '#ff5c5c' : entry.status === 'info' ? '#ffd166' : '#3ddc84';
-  const msgHtml = entry.msg
-    ? `<div style="margin-top:4px;color:#94a3b8;font-size:9px;line-height:1.5;white-space:pre-wrap;">${escHtml(entry.msg)}</div>` : '';
-  const resHtml = entry.res
-    ? `<div style="margin-top:3px;padding:4px 8px;background:#0b0d18;border-left:2px solid ${toColor};
-        color:#6080b0;font-size:9px;line-height:1.5;white-space:pre-wrap;">${escHtml(entry.res)}</div>` : '';
-  return `
-    <div style="background:#101422;border:1px solid #1c2840;border-radius:5px;padding:8px 10px;">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="font-size:8px;color:#304060;">${entry.date} ${entry.ts}</span>
-        <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;
-          color:${fromColor};text-shadow:0 0 6px ${fromColor}44;">${(entry.from||'?').toUpperCase()}</span>
-        <span style="color:#304060;font-size:10px;">→</span>
-        <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;
-          color:${toColor};text-shadow:0 0 6px ${toColor}44;">${(entry.to||'?').toUpperCase()}</span>
-        <span style="margin-left:auto;font-size:8px;color:${statusColor};">● ${entry.status||'ok'}</span>
-      </div>
-      ${msgHtml}${resHtml}
-    </div>`;
+  return AGENT_COLORS[(name||'').toLowerCase()] || '#94a3b8';
 }
 
 function escHtml(s) {
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-async function loadAgentLog() {
-  renderAgentLogPanel();
-  // poll
-  if (agentLogInterval) clearInterval(agentLogInterval);
-  const fetchLogs = async () => {
-    try {
-      const url = '/api/agent-log?since=' + agentLogSince;
-      const r = await fetch(url, {headers: AUTH_HEADERS});
-      if (!r.ok) return;
-      const data = await r.json();
-      const logs = data.logs || [];
-      const stream = document.getElementById('log-stream');
-      const count  = document.getElementById('log-count');
-      if (!stream) return;
-      if (agentLogSince === 0) {
-        // Initial load
-        stream.innerHTML = logs.map(renderLogEntry).join('');
-        stream.scrollTop = stream.scrollHeight;
-      } else if (logs.length > 0) {
-        // Append new entries
-        logs.forEach(e => {
-          stream.insertAdjacentHTML('beforeend', renderLogEntry(e));
-        });
-        stream.scrollTop = stream.scrollHeight;
-      }
-      if (logs.length > 0) {
-        agentLogSince = logs[logs.length-1].epoch;
-      }
-      // Count
-      const total = stream.querySelectorAll('[style*="background:#101422"]').length;
-      if (count) count.textContent = total + ' รายการ';
-    } catch(e) { console.error('log fetch error', e); }
-  };
-  await fetchLogs();
-  agentLogInterval = setInterval(fetchLogs, 3000);
+let chatSince = 0;
+let chatTotal = 0;
+
+function renderChatEntry(entry) {
+  const fromC = agentColor(entry.from);
+  const toC   = agentColor(entry.to);
+  const t = entry.ts || '';
+  const preview = (entry.msg || '').replace(/\n/g,' ').substring(0, 80);
+  const resPrev = (entry.res || '').replace(/\n/g,' ').substring(0, 60);
+  return `<div class="chat-entry">
+    <span style="color:var(--text3);min-width:44px;font-size:9px;">[${t.slice(0,5)}]</span>
+    <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;color:${fromC};text-shadow:0 0 5px ${fromC}44;">${escHtml((entry.from||'?').toUpperCase())}</span>
+    <span style="color:var(--text3);font-size:10px;">→</span>
+    <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:11px;color:${toC};text-shadow:0 0 5px ${toC}44;">${escHtml((entry.to||'?').toUpperCase())}</span>
+    <span style="color:var(--text2);flex:1;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(preview)}${resPrev?' ↩ '+escHtml(resPrev):''}</span>
+  </div>`;
 }
 
-function closeAgentLog() {
-  if (agentLogInterval) { clearInterval(agentLogInterval); agentLogInterval = null; }
-  if (agentLogPanel) { agentLogPanel.remove(); agentLogPanel = null; }
-  agentLogSince = 0;
-  // คืน tab ก่อนหน้า
-  document.querySelector('.ntab.on')?.classList.remove('on');
-  document.querySelector('.ntab')?.classList.add('on');
-}
-
-async function clearAgentLog() {
+async function pollChat() {
   try {
-    await fetch('/api/agent-log/clear', {method:'POST', headers: AUTH_HEADERS});
-    const stream = document.getElementById('log-stream');
-    if (stream) stream.innerHTML = '';
-    agentLogSince = 0;
-  } catch(e) {}
+    const r = await fetch('/api/agent-log?since=' + chatSince, {headers: AUTH_HEADERS});
+    if(!r.ok) return;
+    const data = await r.json();
+    const logs = data.logs || [];
+    const stream = document.getElementById('chat-stream');
+    if(!stream) return;
+    if(chatSince === 0) {
+      stream.innerHTML = logs.map(renderChatEntry).join('');
+    } else if(logs.length > 0) {
+      logs.forEach(e => stream.insertAdjacentHTML('beforeend', renderChatEntry(e)));
+    }
+    if(logs.length > 0) chatSince = logs[logs.length-1].epoch;
+    chatTotal += logs.length;
+    const cnt = document.getElementById('chat-count');
+    if(cnt) cnt.textContent = stream.children.length + ' msgs';
+    stream.scrollTop = stream.scrollHeight;
+    // Update agent last-seen
+    logs.forEach(e => {
+      const id = (e.from||'').toLowerCase();
+      const el = document.getElementById('agent-last-'+id);
+      if(el) { const preview=(e.msg||e.res||'').substring(0,40); el.textContent='Last: '+e.ts+' '+preview; }
+    });
+  } catch(e) { /* silent */ }
+}
+pollChat();
+setInterval(pollChat, 3000);
+
+// ═══════════════════════════════════════════════════════════════
+//  AGENTS PAGE — card grid
+// ═══════════════════════════════════════════════════════════════
+let agentCardsRendered = false;
+
+function renderAgentCards() {
+  if(agentCardsRendered) return;
+  agentCardsRendered = true;
+  const grid = document.getElementById('agent-cards');
+  if(!grid) return;
+  grid.innerHTML = AGENTS.map(a => {
+    const toolTags = a.tools.map(t =>
+      `<span style="display:inline-block;background:var(--bg);border:1px solid var(--border2);border-radius:3px;padding:2px 6px;font-size:9px;color:var(--cyan);margin:2px;font-family:'Share Tech Mono';">${t}</span>`
+    ).join('');
+    return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span style="font-size:24px;">${a.em}</span>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:${a.color};">${a.name}</div>
+          <div style="font-size:9px;color:var(--text2);">${a.role}</div>
+        </div>
+        <div style="margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);"></div>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-bottom:6px;letter-spacing:1px;">TOOLS</div>
+      <div>${toolTags}</div>
+      <div id="agent-last-${a.id}" style="margin-top:8px;font-size:9px;color:var(--text3);border-top:1px solid var(--border);padding-top:6px;">Last: —</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCHEDULE PAGE
+// ═══════════════════════════════════════════════════════════════
+const DEFAULT_SCHEDULE = {
+  jobs:[{
+    time:'09:00',
+    days:['Mon','Tue','Wed','Thu','Fri'],
+    agent:'Rocket',
+    task:'Consolidated Morning Report (Coin+People+Sage)',
+    enabled:true,
+  }]
+};
+const DAY_KEYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+let scheduleData = null;
+
+async function loadSchedule() {
+  if(scheduleData) { renderScheduleRows(); return; }
+  try {
+    const r = await fetch('/api/schedule-config', {headers: AUTH_HEADERS});
+    if(!r.ok) throw new Error('not ok');
+    scheduleData = await r.json();
+  } catch {
+    scheduleData = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE));
+  }
+  renderScheduleRows();
+}
+
+function renderScheduleRows() {
+  const container = document.getElementById('sch-rows');
+  if(!container) return;
+  const jobs = scheduleData.jobs || [];
+  container.innerHTML = jobs.map((job, idx) => buildRowHtml(job, idx)).join('');
+}
+
+function buildRowHtml(job, idx) {
+  const dayBtns = DAY_KEYS.map(d => {
+    const on = (job.days||[]).includes(d);
+    return `<span class="sch-day ${on?'on':''}" onclick="toggleDay(${idx},'${d}')">${d}</span>`;
+  }).join('');
+  const agentOpts = AGENTS.map(a =>
+    `<option value="${a.name}" ${job.agent===a.name?'selected':''}>${a.em} ${a.name}</option>`
+  ).join('');
+  return `<div class="sch-row" id="sch-row-${idx}">
+    <input class="sch-time" type="time" value="${job.time||'09:00'}" onchange="scheduleData.jobs[${idx}].time=this.value"/>
+    <div class="sch-days" id="sch-days-${idx}">${dayBtns}</div>
+    <select class="sch-agent" onchange="scheduleData.jobs[${idx}].agent=this.value">${agentOpts}</select>
+    <input class="sch-task" type="text" value="${escHtml(job.task||'')}" placeholder="Task description..."
+           onchange="scheduleData.jobs[${idx}].task=this.value"/>
+    <button class="sch-toggle ${job.enabled?'on':'off'}" onclick="toggleEnabled(${idx})" title="${job.enabled?'Enabled':'Disabled'}">
+      ${job.enabled?'ON':'OFF'}
+    </button>
+    <button class="sch-del" onclick="deleteScheduleRow(${idx})" title="Delete">✕</button>
+  </div>`;
+}
+
+function toggleDay(idx, day) {
+  const job = scheduleData.jobs[idx];
+  if(!job) return;
+  job.days = job.days || [];
+  if(job.days.includes(day)) job.days = job.days.filter(d=>d!==day);
+  else job.days.push(day);
+  const container = document.getElementById('sch-days-'+idx);
+  if(container) container.innerHTML = DAY_KEYS.map(d => {
+    const on = job.days.includes(d);
+    return `<span class="sch-day ${on?'on':''}" onclick="toggleDay(${idx},'${d}')">${d}</span>`;
+  }).join('');
+}
+
+function toggleEnabled(idx) {
+  const job = scheduleData.jobs[idx];
+  if(!job) return;
+  job.enabled = !job.enabled;
+  const btn = document.querySelector(`#sch-row-${idx} .sch-toggle`);
+  if(btn){ btn.className='sch-toggle '+(job.enabled?'on':'off'); btn.textContent=job.enabled?'ON':'OFF'; }
+}
+
+function addScheduleRow() {
+  if(!scheduleData) scheduleData = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE));
+  scheduleData.jobs.push({time:'09:00',days:['Mon','Tue','Wed','Thu','Fri'],agent:'Rocket',task:'',enabled:true});
+  renderScheduleRows();
+}
+
+function deleteScheduleRow(idx) {
+  if(!scheduleData) return;
+  scheduleData.jobs.splice(idx, 1);
+  renderScheduleRows();
+}
+
+async function saveSchedule() {
+  // Sync current text input values before saving
+  const rows = document.querySelectorAll('.sch-row');
+  rows.forEach((row, idx) => {
+    const taskInput = row.querySelector('.sch-task');
+    const timeInput = row.querySelector('.sch-time');
+    if(taskInput && scheduleData.jobs[idx]) scheduleData.jobs[idx].task = taskInput.value;
+    if(timeInput && scheduleData.jobs[idx]) scheduleData.jobs[idx].time = timeInput.value;
+  });
+  const status = document.getElementById('sch-status');
+  if(status) { status.textContent = 'Saving...'; status.style.color='var(--yellow)'; }
+  try {
+    const r = await fetch('/api/schedule-config', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...AUTH_HEADERS},
+      body: JSON.stringify(scheduleData),
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    if(status){ status.textContent='✓ Saved'; status.style.color='var(--green)'; setTimeout(()=>{ if(status)status.textContent=''; },3000); }
+  } catch(e) {
+    if(status){ status.textContent='✗ Error: '+e.message; status.style.color='var(--red)'; }
+  }
 }
 </script>
 </body>

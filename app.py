@@ -1,5 +1,5 @@
 """
-OWNDAYS L&D Secretary Bot v29
+OWNDAYS L&D Secretary Bot v30
 LINE Bot + Claude API + Google Sheets + PostgreSQL Memory
 """
 
@@ -377,6 +377,9 @@ MEGA Bangna, Zpell @ Future Park, Central Eastville, Seacon Bangkae, Seacon Squa
 # CLAUDE RESPONSE
 # =============================================================
 def get_claude_response(user_id: str, message: str) -> str:
+    # Log incoming message
+    log_agent("user", "rocket", message[:200])
+
     # โหลด history จาก DB
     history = load_history(user_id, limit=20)
 
@@ -402,7 +405,12 @@ def get_claude_response(user_id: str, message: str) -> str:
                 for block in response.content:
                     if block.type == "tool_use":
                         print(f"Tool: {block.name}")
+                        # Log Rocket calling a sub-agent
+                        target = block.name.replace("ask_", "")
+                        task_preview = str(block.input)[:150]
+                        log_agent("rocket", target, task_preview)
                         result = execute_tool(block.name, block.input)
+                        log_agent(target, "rocket", "", result[:250])
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
@@ -419,10 +427,12 @@ def get_claude_response(user_id: str, message: str) -> str:
                     final_text += block.text
 
             save_message(user_id, "assistant", final_text)
+            log_agent("rocket", "user", "", final_text[:200])
             return final_text
 
     except Exception as e:
         print(f"Claude Error: {e}")
+        log_agent("rocket", "user", "", f"ERROR: {e}", status="error")
         return "ขอโทษครับ ระบบมีปัญหาชั่วคราว กรุณาลองใหม่อีกครั้ง"
 
 
@@ -459,7 +469,7 @@ def reply_message(reply_token, text):
 # =============================================================
 @app.route("/", methods=["GET"])
 def health_check():
-    return "LD Secretary Bot v29 - Rocket is running!", 200
+    return "LD Secretary Bot v30 - Rocket is running!", 200
 
 
 @app.route("/webhook", methods=["POST"])
@@ -618,6 +628,47 @@ def api_agent_log_clear():
         return jsonify({"error": "unauthorized"}), 401
     clear_logs()
     return jsonify({"ok": True})
+
+
+SCHEDULE_CONFIG_FILE = "schedule_config.json"
+DEFAULT_SCHEDULE = {
+    "jobs": [
+        {
+            "time": "09:00",
+            "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+            "agent": "Rocket",
+            "task": "Consolidated Morning Report (Coin + People + Sage)",
+            "enabled": True
+        }
+    ]
+}
+
+
+@app.route("/api/schedule-config", methods=["GET"])
+def api_schedule_config_get():
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import json as _json
+        with open(SCHEDULE_CONFIG_FILE, "r") as f:
+            return jsonify(_json.load(f))
+    except Exception:
+        return jsonify(DEFAULT_SCHEDULE)
+
+
+@app.route("/api/schedule-config", methods=["POST"])
+def api_schedule_config_post():
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    try:
+        import json as _json
+        with open(SCHEDULE_CONFIG_FILE, "w") as f:
+            _json.dump(data, f, ensure_ascii=False, indent=2)
+        log_agent("dashboard", "scheduler", "อัพเดต schedule config", str(data)[:200])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # Start scheduler
