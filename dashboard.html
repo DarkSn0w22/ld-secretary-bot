@@ -644,58 +644,50 @@ let taskCount = 0;
 let scaleX = 1, scaleY = 1;
 
 // ─── Asset loading ───────────────────────────────────────────
-let bgImg = null,  bgReady = false;
-let rawSprImg = null;  // raw sprite Image
-const agentSprites = {};  // agent_id → processed canvas (white removed)
+let bgImg = null, bgReady = false;
+const agentSprites = {};   // agent_id → Image (individual 200×200 PNGs)
+let spritesLoaded = 0;
 let spritesReady = false;
+const SPR_SIZE = 200;      // each sprite is 200×200
 
-// ── Load assets with crossOrigin for canvas getImageData ────────
+// ── Load all assets ─────────────────────────────────────────────
 (function loadAssets() {
+  // Background
   const bg = new Image();
   bg.crossOrigin = 'anonymous';
-  bg.onload  = () => { bgImg = bg; bgReady = true; console.log('[BG] ready'); };
-  bg.onerror = () => console.warn('[BG] load failed — using fallback');
+  bg.onload  = () => { bgImg = bg; bgReady = true; };
+  bg.onerror = () => console.warn('[BG] load failed');
   bg.src = '/static/office_bg.png';
 
-  const spr = new Image();
-  spr.crossOrigin = 'anonymous';
-  spr.onload  = () => {
-    rawSprImg = spr;
-    // Store raw image — we'll draw from it directly (no getImageData needed)
-    // Also try to build cleaned sprites
-    AGENTS.forEach(a => {
-      const idx = SPRITE_IDX[a.id];
-      if (idx === undefined) return;
-      const sx = (idx % SPR_COLS) * SPR_W;
-      const sy = Math.floor(idx / SPR_COLS) * SPR_H;
+  // Individual agent sprites — /static/{id}.png
+  AGENTS.forEach(a => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      // White background removal via canvas
       const sc = document.createElement('canvas');
-      sc.width = SPR_W; sc.height = SPR_H;
+      sc.width = SPR_SIZE; sc.height = SPR_SIZE;
       const sctx = sc.getContext('2d');
-      sctx.drawImage(spr, sx, sy, SPR_W, SPR_H, 0, 0, SPR_W, SPR_H);
+      sctx.drawImage(img, 0, 0, SPR_SIZE, SPR_SIZE);
       try {
-        const id = sctx.getImageData(0, 0, SPR_W, SPR_H);
+        const id = sctx.getImageData(0, 0, SPR_SIZE, SPR_SIZE);
         const d = id.data;
         for (let i = 0; i < d.length; i += 4) {
-          if (d[i]>215 && d[i+1]>215 && d[i+2]>215) d[i+3] = 0;
+          if (d[i]>220 && d[i+1]>220 && d[i+2]>220) d[i+3] = 0;
         }
         sctx.putImageData(id, 0, 0);
-      } catch(e) { console.warn('[Sprites] getImageData blocked, using raw'); }
+      } catch(e) { /* CORS fallback */ }
       agentSprites[a.id] = sc;
-    });
-    spritesReady = true;
-    console.log('[Sprites] ready:', Object.keys(agentSprites).length, 'agents');
-  };
-  spr.onerror = () => console.warn('[Sprites] load failed — using emoji fallback');
-  spr.src = '/static/agents_sprites.png';
+      spritesLoaded++;
+      if (spritesLoaded >= AGENTS.length) {
+        spritesReady = true;
+        console.log('[Sprites] all', spritesLoaded, 'ready');
+      }
+    };
+    img.onerror = () => { spritesLoaded++; };
+    img.src = '/static/' + a.id + '.png';
+  });
 })();
-
-// Sprite sheet: 4 cols × 3 rows, each cell 316×280
-const SPR_COLS=4, SPR_W=316, SPR_H=280;
-const SPRITE_IDX = {
-  rocket:0, atlas:1, pulse:2, guard:3,
-  sage:4, coin:5, sigma:6, people:7,
-  lex:8, rex:9, pixel:10, lens:11
-};
 
 function resizeCanvas() {
   const cp = canvas.parentElement;
@@ -842,24 +834,24 @@ function drawChar(w) {
   ctx.fill();
 
   const spr = agentSprites[agent.id];
-  if (spritesReady && spr) {
-    // Display size — maintain aspect ratio (SPR_W × SPR_H)
-    const dH = ps(38);     // ลดขนาดจาก 55 → 38 ให้เข้ากับโต๊ะ
-    const dW = dH * (SPR_W / SPR_H);
+  if (spr) {
+    // Square sprite 200×200 → display size
+    const dH = ps(38);
+    const dW = dH;
 
-    const bob = moving ? (frame%2===0 ? -ps(2) : ps(0.5)) : 0;
-    const glow = busy ? Math.sin(Date.now()/220)*ps(2) : 0;
+    const bob = moving ? (frame%2===0 ? -ps(1.5) : ps(0.5)) : 0;
+    const glow = busy ? Math.sin(Date.now()/220)*ps(1.5) : 0;
     const drawX = px(x) - dW/2;
-    const drawY = py(y) - dH*0.85 + bob + glow;
+    const drawY = py(y) - dH*0.8 + bob + glow;
 
     // Busy aura
     if (busy) {
       ctx.save();
-      ctx.globalAlpha = 0.18 + 0.08*Math.sin(Date.now()/300);
-      ctx.shadowBlur = ps(18); ctx.shadowColor = agent.color;
+      ctx.globalAlpha = 0.2 + 0.1*Math.sin(Date.now()/300);
+      ctx.shadowBlur = ps(16); ctx.shadowColor = agent.color;
       ctx.fillStyle = agent.color;
       ctx.beginPath();
-      ctx.ellipse(px(x), drawY+dH*0.6, dW*0.42, dH*0.42, 0, 0, Math.PI*2);
+      ctx.ellipse(px(x), drawY+dH*0.55, dW*0.4, dH*0.4, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
     }
@@ -869,7 +861,7 @@ function drawChar(w) {
       ctx.translate(px(x)*2, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(spr, 0, 0, SPR_W, SPR_H, drawX, drawY, dW, dH);
+    ctx.drawImage(spr, 0, 0, SPR_SIZE, SPR_SIZE, drawX, drawY, dW, dH);
 
   } else {
     // Fallback emoji while sprites load
@@ -1324,75 +1316,6 @@ const TIERS = {
 };
 
 // ─── Draw mini pixel-art sprite on a card canvas ─────────────
-function drawCardSprite(cvs, agent) {
-  const W = cvs.width, H = cvs.height;
-  const c = cvs.getContext('2d');
-  c.clearRect(0, 0, W, H);
-  c.imageSmoothingEnabled = false;
-  const sc = W / 60;    // scale factor (canvas is 60 units wide)
-  function p(v){ return v * sc; }
-  const x = W/2, y = H * 0.72;
-
-  // Glow aura
-  const aura = c.createRadialGradient(x, y-p(8), 0, x, y-p(8), p(22));
-  aura.addColorStop(0, (TIERS[agent.id]?.g || 'rgba(79,158,255,.15)'));
-  aura.addColorStop(1, 'transparent');
-  c.fillStyle = aura;
-  c.beginPath(); c.ellipse(x, y-p(8), p(22), p(22), 0, 0, Math.PI*2); c.fill();
-
-  // Shadow
-  c.fillStyle = 'rgba(0,0,0,.45)';
-  c.beginPath(); c.ellipse(x, y+p(12), p(9), p(2.5), 0, 0, Math.PI*2); c.fill();
-
-  // Legs
-  c.fillStyle = '#1a2535';
-  c.fillRect(x-p(5), y+p(1), p(4), p(9));
-  c.fillRect(x+p(1), y+p(1), p(4), p(9));
-  // Shoes
-  c.fillStyle = '#0a0f1a';
-  c.fillRect(x-p(6), y+p(9), p(5), p(3));
-  c.fillRect(x+p(1), y+p(9), p(5), p(3));
-
-  // Body gradient
-  const bg = c.createLinearGradient(0, y-p(11), 0, y+p(2));
-  bg.addColorStop(0, agent.bodyCol);
-  bg.addColorStop(1, shadeColor(agent.bodyCol, -35));
-  c.fillStyle = bg; c.fillRect(x-p(7), y-p(11), p(14), p(13));
-  // Shirt shine
-  c.fillStyle = 'rgba(255,255,255,.17)'; c.fillRect(x-p(2), y-p(11), p(4), p(3));
-  // Arms
-  c.fillStyle = agent.bodyCol;
-  c.fillRect(x-p(11), y-p(9), p(4), p(10)); c.fillRect(x+p(7), y-p(9), p(4), p(10));
-  // Hands
-  c.fillStyle = '#f5c9a0';
-  c.fillRect(x-p(11), y+p(1), p(4), p(4)); c.fillRect(x+p(7), y+p(1), p(4), p(4));
-
-  // Neck + Head
-  c.fillStyle = '#f5c9a0';
-  c.fillRect(x-p(2.5), y-p(14), p(5), p(3));
-  c.fillRect(x-p(7), y-p(26), p(14), p(13));
-
-  // Hair
-  c.fillStyle = agent.hairCol;
-  c.fillRect(x-p(7), y-p(26), p(14), p(5));
-  c.fillRect(x-p(8), y-p(26), p(2), p(9));
-
-  // Eyes
-  c.fillStyle = '#050510';
-  c.fillRect(x-p(4.5), y-p(19), p(2.5), p(3)); c.fillRect(x+p(2), y-p(19), p(2.5), p(3));
-  c.fillStyle = 'rgba(255,255,255,.65)';
-  c.fillRect(x-p(4), y-p(19), p(1), p(1.2)); c.fillRect(x+p(2.5), y-p(19), p(1), p(1.2));
-  // Mouth smile
-  c.fillStyle = '#c07070';
-  c.fillRect(x-p(2), y-p(14.5), p(4), p(1));
-
-  // Big emoji above head (bouncing)
-  const bounce = Math.sin(Date.now()/700) * p(1.5);
-  c.font = `${p(13)}px serif`;
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText(agent.em, x, y-p(36)+bounce);
-}
-
 function renderAgentCards() {
   if(agentCardsRendered) return;
   agentCardsRendered = true;
@@ -1410,8 +1333,11 @@ function renderAgentCards() {
                        selectAgent('${a.id}')">
       <div class="gtier">${tier.t}</div>
       <div class="gonline"></div>
-      <div class="gsprite">
-        <canvas id="card-cvs-${a.id}" width="120" height="148" style="width:120px;height:148px;"></canvas>
+      <div class="gsprite" style="background:radial-gradient(circle at 50% 60%,${tier.g} 0%,transparent 70%);">
+        <img src="/static/${a.id}.png" alt="${a.name}"
+             style="width:110px;height:110px;object-fit:contain;
+                    filter:drop-shadow(0 0 8px ${tier.g});
+                    image-rendering:auto;" />
       </div>
       <div class="gbody">
         <div class="gname">${a.name}</div>
@@ -1422,19 +1348,7 @@ function renderAgentCards() {
     </div>`;
   }).join('');
 
-  // Draw sprites (+ re-animate every second)
-  function animateCards() {
-    AGENTS.forEach(a => {
-      const cvs = document.getElementById('card-cvs-'+a.id);
-      if(cvs) drawCardSprite(cvs, a);
-    });
-  }
-  animateCards();
-  if(!window._cardAnimInterval) {
-    window._cardAnimInterval = setInterval(() => {
-      if(document.getElementById('pg-agents').style.display !== 'none') animateCards();
-    }, 800);
-  }
+  // No canvas animation needed — using real PNG images
 }
 
 // ═══════════════════════════════════════════════════════════════
