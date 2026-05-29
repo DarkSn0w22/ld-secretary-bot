@@ -5,6 +5,7 @@ Reviewer/QA AI — "Guard"
 
 import os
 import anthropic
+from models_config import get_model
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -63,7 +64,7 @@ def run_reviewer(content: str, content_type: str = "report", context: str = "") 
 
     try:
         response = claude.messages.create(
-            model="claude-sonnet-4-5",
+            model=get_model("guard"),
             max_tokens=2000,
             system=GUARD_PROMPT,
             messages=[{"role": "user", "content": prompt}]

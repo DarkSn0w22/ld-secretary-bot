@@ -6,6 +6,7 @@ Legal Manager AI — "Lex"
 
 import os
 import anthropic
+from models_config import get_model
 from google_search import google_search
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
@@ -105,7 +106,7 @@ def run_legal_manager(task, context=""):
     try:
         for _ in range(3):
             response = claude.messages.create(
-                model="claude-sonnet-4-5",
+                model=get_model("lex"),
                 max_tokens=2048,
                 system=LEX_PROMPT,
                 tools=LEX_TOOLS,

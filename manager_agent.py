@@ -6,6 +6,7 @@ Manager AI — Background Orchestrator
 import os
 import json
 import anthropic
+from models_config import get_model
 from dashboard_api import get_survey_dashboard, get_oar_dashboard, get_area_dashboard, get_cost_dashboard, get_all_dashboard
 from google_search import google_search
 
@@ -107,7 +108,7 @@ def run_manager(task: str, context: str = "") -> str:
     try:
         while True:
             response = claude.messages.create(
-                model="claude-sonnet-4-5",
+                model=get_model("atlas"),
                 max_tokens=2048,
                 system=MANAGER_PROMPT,
                 tools=MANAGER_TOOLS,

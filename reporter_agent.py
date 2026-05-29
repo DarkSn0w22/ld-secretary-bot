@@ -6,6 +6,7 @@ Reporter AI — "Sage"
 
 import os
 import anthropic
+from models_config import get_model
 import requests
 from dashboard_api import get_all_dashboard
 
@@ -49,7 +50,7 @@ def generate_report(data: str, report_type: str = "weekly") -> str:
 
     try:
         response = claude.messages.create(
-            model="claude-sonnet-4-5",
+            model=get_model("sage"),
             max_tokens=1500,
             system=SAGE_PROMPT,
             messages=[{"role": "user", "content": prompt}]

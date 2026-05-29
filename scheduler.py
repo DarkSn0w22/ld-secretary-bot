@@ -11,6 +11,7 @@ from datetime import datetime
 import pytz
 import requests
 import anthropic
+from models_config import get_model
 from dashboard_api import get_survey_dashboard
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
@@ -75,7 +76,7 @@ def generate_daily_brief() -> str:
 
     try:
         response = claude.messages.create(
-            model="claude-sonnet-4-5",
+            model=get_model("scheduler"),
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -104,6 +105,17 @@ def scheduler_loop():
                 run_daily_budget_check()
             except Exception as e:
                 print(f"Coin daily check error: {e}")
+
+        # People Probation Check: 09:00 ทุกวันจันทร์
+        if (now.hour == 9 and
+                now.minute == 0 and
+                weekday == 0 and
+                sent_report_today != today):
+            try:
+                from hr_agent import check_probation_alerts
+                check_probation_alerts()
+            except Exception as e:
+                print(f"People probation check error: {e}")
 
         # Daily Brief: 10:30
         if (now.hour == BRIEF_HOUR and

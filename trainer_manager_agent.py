@@ -6,6 +6,7 @@ Trainer Manager AI — "Pulse"
 
 import os
 import anthropic
+from models_config import get_model
 from dashboard_api import get_survey_dashboard, get_oar_dashboard, get_area_dashboard, get_assessment_dashboard, get_cost_dashboard
 from google_search import google_search
 
@@ -106,7 +107,7 @@ def run_trainer_manager(task, context=""):
     try:
         for _ in range(max_loops):
             response = claude.messages.create(
-                model="claude-sonnet-4-5",
+                model=get_model("pulse"),
                 max_tokens=2048,
                 system=PULSE_PROMPT,
                 tools=PULSE_TOOLS,

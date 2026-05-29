@@ -8,8 +8,9 @@ import json
 import hashlib
 import hmac
 import base64
-from flask import Flask, request, abort
+from flask import Flask, request, abort, jsonify, send_file, Response
 import anthropic
+from models_config import get_model
 import requests
 from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, SHEET_IDS
 from memory import init_db, load_history, save_message, clear_history, get_message_count
@@ -21,17 +22,24 @@ from reporter_agent import run_reporter
 from reviewer_agent import run_reviewer
 from financial_agent import run_financial_manager
 from legal_agent import run_legal_manager
+from hr_agent import run_hr_manager
+from web_agent import run_web_admin
+from data_agent import run_data_analyst
+from creator_agent import run_creator
+from models_config import print_model_summary
 
 app = Flask(__name__)
 
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+DASHBOARD_TOKEN = os.getenv("DASHBOARD_TOKEN", "")  # ถ้าเว้นว่าง = เปิด public (จะเตือนใน log)
 
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # Init DB on startup
 init_db()
+print_model_summary()
 
 # =============================================================
 # TOOLS
@@ -162,6 +170,50 @@ TOOLS = [
             },
             "required": ["task"]
         }
+    },
+    {
+        "name": "ask_hr",
+        "description": "ให้ HR Manager AI (People) ค้นหาข้อมูลพนักงาน, เช็ค probation, วิเคราะห์ headcount, turnover และ HR insights",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "งาน HR เช่น ค้นหาพนักงาน, เช็ค probation, สรุป headcount"}
+            },
+            "required": ["task"]
+        }
+    },
+    {
+        "name": "ask_web_admin",
+        "description": "ให้ Web Admin AI (Pixel) ตรวจสอบสถานะ od-connect.com, วิเคราะห์ content และแนะนำการปรับปรุง",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "งาน web เช่น เช็คสถานะเว็บ, ดู content, แนะนำ UX"}
+            },
+            "required": ["task"]
+        }
+    },
+    {
+        "name": "ask_data_analyst",
+        "description": "ให้ Data Analysis AI (Sigma) วิเคราะห์ข้อมูลเชิงลึก, trends, KPI comparison และ insights",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "งานวิเคราะห์ เช่น เปรียบเทียบ area, trainer ranking, trend analysis"}
+            },
+            "required": ["task"]
+        }
+    },
+    {
+        "name": "ask_creator",
+        "description": "ให้ Creator AI (Lens) สร้าง training content, quiz, สคริปต์, หรือสื่อการสอน",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "งาน content เช่น เขียน quiz BSC, สร้างสคริปต์ video, แต่ง LINE message"}
+            },
+            "required": ["task"]
+        }
     }
 ]
 
@@ -197,6 +249,18 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "ask_legal":
         task = tool_input.get("task", "")
         return run_legal_manager(task)
+    elif tool_name == "ask_hr":
+        task = tool_input.get("task", "")
+        return run_hr_manager(task)
+    elif tool_name == "ask_web_admin":
+        task = tool_input.get("task", "")
+        return run_web_admin(task)
+    elif tool_name == "ask_data_analyst":
+        task = tool_input.get("task", "")
+        return run_data_analyst(task)
+    elif tool_name == "ask_creator":
+        task = tool_input.get("task", "")
+        return run_creator(task)
     return "ไม่พบ tool นี้"
 
 
@@ -278,7 +342,7 @@ def get_claude_response(user_id: str, message: str) -> str:
     try:
         while True:
             response = claude.messages.create(
-                model="claude-sonnet-4-5",
+                model=get_model("rocket"),
                 max_tokens=1024,
                 system=SECRETARY_PROMPT,
                 tools=TOOLS,
@@ -386,6 +450,83 @@ def webhook():
                 reply_message(reply_token, response)
 
     return "OK", 200
+
+
+# =============================================================
+# DASHBOARD (AI Office)
+# =============================================================
+# Map agent id -> ฟังก์ชันที่จะเรียก (รับ task เป็น arg แรก)
+DASHBOARD_AGENTS = {
+    "atlas":  run_manager,
+    "pulse":  run_trainer_manager,
+    "sage":   run_reporter,
+    "guard":  run_reviewer,
+    "coin":   run_financial_manager,
+    "lex":    run_legal_manager,
+    "people": run_hr_manager,
+    "pixel":  run_web_admin,
+    "sigma":  run_data_analyst,
+    "lens":   run_creator,
+}
+
+DASHBOARD_USER_ID = "dashboard-console"  # user id แยกสำหรับสั่งงานผ่านเว็บ
+
+
+def _check_dashboard_auth(req) -> bool:
+    """เช็ค token. ถ้าไม่ตั้ง DASHBOARD_TOKEN = เปิด public (warn)."""
+    if not DASHBOARD_TOKEN:
+        return True
+    token = (
+        req.headers.get("X-Dashboard-Token", "")
+        or req.args.get("key", "")
+    )
+    return hmac.compare_digest(token, DASHBOARD_TOKEN)
+
+
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    if not _check_dashboard_auth(request):
+        return Response("403 — ต้องใส่ ?key=YOUR_TOKEN ครับ", status=403)
+    try:
+        with open("dashboard.html", "r", encoding="utf-8") as f:
+            html = f.read()
+        # ฝัง token ลงในหน้าเว็บ เพื่อให้ JS เรียก API ต่อได้
+        html = html.replace("__DASHBOARD_TOKEN__", DASHBOARD_TOKEN or "")
+        return Response(html, mimetype="text/html")
+    except FileNotFoundError:
+        return Response("dashboard.html not found", status=404)
+
+
+@app.route("/api/ping", methods=["GET"])
+def api_ping():
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify({"status": "ok", "agents": 11})
+
+
+@app.route("/api/agent", methods=["POST"])
+def api_agent():
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    agent = (data.get("agent") or "rocket").lower()
+    task = (data.get("task") or "").strip()
+    if not task:
+        return jsonify({"error": "ไม่มีคำสั่ง"}), 400
+
+    try:
+        if agent == "rocket":
+            # Rocket = เลขาหลัก ใช้ flow เต็ม (memory + tools)
+            result = get_claude_response(DASHBOARD_USER_ID, task)
+        elif agent in DASHBOARD_AGENTS:
+            result = DASHBOARD_AGENTS[agent](task)
+        else:
+            return jsonify({"error": f"ไม่รู้จัก agent: {agent}"}), 400
+        return jsonify({"result": result})
+    except Exception as e:
+        print(f"api_agent error ({agent}): {e}")
+        return jsonify({"error": f"ระบบขัดข้อง: {e}"}), 500
 
 
 # Start scheduler

@@ -6,6 +6,7 @@ Financial Manager AI — "Coin"
 
 import os
 import anthropic
+from models_config import get_model
 import requests
 from dashboard_api import get_cost_dashboard, fetch_dashboard
 from google_search import google_search
@@ -203,7 +204,7 @@ def run_financial_manager(task, context=""):
     try:
         for _ in range(3):
             response = claude.messages.create(
-                model="claude-sonnet-4-5",
+                model=get_model("coin"),
                 max_tokens=2048,
                 system=COIN_PROMPT,
                 tools=COIN_TOOLS,
