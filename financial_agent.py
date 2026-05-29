@@ -27,6 +27,8 @@ COIN_PROMPT = """คุณคือ "Coin" — Financial Manager AI ของ OW
 - วิเคราะห์ ROI ของแต่ละ training program
 - แจ้งเตือนเมื่อใช้งบเกิน 80%
 - จัดทำรายงานการเงินสำหรับ MD, CFO, Accounting
+- เสนอแนวทางการใช้จ่ายที่มีประสิทธิภาพและคุ้มค่า
+
 
 สกุลเงิน: ไทยบาท (฿)
 ผู้รับรายงาน: Peanut, MD, CFO, Accounting
