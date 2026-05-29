@@ -419,79 +419,118 @@ def people_watch() -> dict:
 
 
 def pixel_watch() -> dict:
-    """Pixel — Web Admin proactive watch"""
+    """Pixel — Web Admin: uptime + WIX analytics + report สำหรับ Rocket"""
     try:
-        log_agent("scheduler", "pixel", "[watch] autonomous web check")
+        log_agent("pixel", "scheduler", "[watch] เริ่มตรวจ uptime + ดึง analytics")
 
-        from wix_api import check_site_uptime, check_pages_uptime
+        from wix_api import (check_site_uptime, check_pages_uptime,
+                              get_analytics_overview, get_blog_posts, wix_ready)
 
-        # ตรวจ uptime
-        uptime = check_site_uptime()
+        # ── Uptime ───────────────────────────────────────────────
+        uptime       = check_site_uptime()
         pages_status = check_pages_uptime()
+        down_pages   = [p for p in pages_status if not p.get("ok")]
+        slow_pages   = [p for p in pages_status if p.get("ok") and p.get("latency_ms", 0) > 3000]
 
-        down_pages = [p for p in pages_status if not p.get("ok")]
-        slow_pages = [p for p in pages_status
-                      if p.get("ok") and p.get("latency_ms", 0) > 3000]
+        # ── Analytics 7 วัน ─────────────────────────────────────
+        analytics = get_analytics_overview(days=7) if wix_ready() else {"error": "WIX API ไม่พร้อม"}
+        posts     = get_blog_posts(limit=5) if wix_ready() else []
 
-        # WIX API ถ้ามี key
-        wix_info = ""
-        wix_key = os.getenv("WIX_API_KEY", "")
-        if wix_key:
-            try:
-                from wix_api import get_blog_posts
-                posts = get_blog_posts(limit=3)
-                if posts:
-                    wix_info = "Blog posts ล่าสุด: " + ", ".join(
-                        p.get("title", "?") for p in posts
-                    )
-            except Exception:
-                pass
+        log_agent("pixel", "wix_api", "ดึง analytics 7 วัน",
+                  f"sessions={analytics.get('overview',{}).get('sessions','?')}")
+
+        overview   = analytics.get("overview", {})
+        countries  = analytics.get("top_countries", [])
+        top_pages  = analytics.get("top_pages", [])
+        sources    = analytics.get("traffic_sources", [])
+        devices    = analytics.get("devices", [])
+
+        def fmt_list(rows, key1, key2, label2, n=5):
+            return "\n".join(
+                f"  {r.get(key1,'?')}: {r.get(key2,0):,} {label2}"
+                for r in rows[:n]
+            ) or "  ไม่มีข้อมูล"
 
         system = (
-            "คุณคือ Pixel Web admin ที่ดูแลเว็บไซต์ e-learning มา 8 ปี "
-            "รู้ UX/UI และ content strategy อย่างละเอียด "
-            "วิเคราะห์ปัญหาเว็บและเสนอแนะการปรับปรุงแบบ proactive "
+            "คุณคือ Pixel — Web Admin AI ของ OWNDAYS L&D Thailand\n"
+            "ดูแล od-connect.com (WIX) มา 8 ปี เชี่ยวชาญ UX/UI, analytics, SEO, content strategy\n"
+            "วิเคราะห์เชิงลึกจาก data จริง เสนอ action ที่ทำได้จริง\n"
+            "เตรียมรายงานให้ Rocket (เลขา) นำส่ง Peanut\n"
             "ตอบ plain text ไม่ใช้ Markdown ลงท้ายครับ"
         )
 
-        status_lines = []
-        for p in pages_status:
-            icon = "ok" if p.get("ok") else "DOWN"
-            latency = p.get("latency_ms", "?")
-            status_lines.append(f"  {p['path']}: {icon} ({latency}ms)")
+        user_content = f"""รายงานสถานะ od-connect.com (7 วันล่าสุด)
 
-        user_content = (
-            f"สถานะ od-connect.com:\n"
-            f"  หน้าหลัก: {uptime.get('status','?').upper()} "
-            f"({uptime.get('latency_ms','?')}ms)\n"
-            f"\nรายละเอียดแต่ละหน้า:\n"
-            + "\n".join(status_lines)
-            + f"\n\n{wix_info}\n\n"
-            "วิเคราะห์:\n"
-            "1. สถานะเว็บไซต์โดยรวม\n"
-            "2. หน้าที่มีปัญหาหรือช้า (ถ้ามี)\n"
-            "3. ไอเดียปรับปรุง UX/content/SEO\n"
-            "สรุปกระชับ ไม่เกิน 400 ตัวอักษร ลงท้ายครับ"
-        )
-        summary = _ask_claude("pixel", system, user_content)
+UPTIME:
+  หน้าหลัก: {uptime.get('status','?').upper()} ({uptime.get('latency_ms','?')}ms)
+{'  ⚠️ หน้าที่ DOWN: ' + ', '.join(p['path'] for p in down_pages) if down_pages else '  ทุกหน้าปกติ'}
 
+ANALYTICS OVERVIEW:
+  Sessions:        {overview.get('sessions','N/A'):,}
+  Unique Visitors: {overview.get('unique_visitors','N/A'):,}
+  Page Views:      {overview.get('page_views','N/A'):,}
+  Bounce Rate:     {overview.get('bounce_rate_pct','N/A')}%
+  Avg Session:     {overview.get('avg_session_sec','N/A')} วินาที
+
+TOP LOCATIONS:
+{fmt_list(countries, 'country', 'sessions', 'sessions')}
+
+TOP PAGES:
+{fmt_list(top_pages, 'page', 'page_views', 'views')}
+
+TRAFFIC SOURCES:
+{fmt_list(sources, 'source', 'sessions', 'sessions')}
+
+DEVICES:
+{fmt_list(devices, 'device', 'sessions', 'sessions')}
+
+BLOG POSTS ล่าสุด:
+{chr(10).join("  - " + p.get("title","?") for p in posts) or "  ไม่มีข้อมูล"}
+
+วิเคราะห์และเตรียมรายงานให้ Rocket ส่งต่อ Peanut:
+1. ภาพรวม traffic ใน 7 วัน — สูง/ต่ำกว่าปกติ?
+2. Location insights — ผู้ใช้หลักมาจากไหน ควรทำอะไรต่อ
+3. Page performance — หน้าไหน hot/cold
+4. ปัญหาเร่งด่วน (ถ้ามี)
+5. Action items 3 ข้อที่ทำได้ใน 7 วัน
+
+ไม่เกิน 600 ตัวอักษร ลงท้ายครับ"""
+
+        summary = _ask_claude("pixel", system, user_content, max_tokens=700)
+
+        # ── Alerts ───────────────────────────────────────────────
         alerts = []
         if uptime.get("status") not in ("up",):
-            alerts.append(
-                f"od-connect.com {uptime.get('status','?').upper()}: {uptime.get('error','')}"
-            )
+            alerts.append(f"⚠️ od-connect.com {uptime.get('status','?').upper()}")
         for p in down_pages:
-            alerts.append(f"หน้า {p['path']} ไม่สามารถเข้าถึงได้")
+            alerts.append(f"หน้า {p['path']} DOWN")
         for p in slow_pages:
-            alerts.append(f"หน้า {p['path']} โหลดช้า {p.get('latency_ms','?')}ms")
+            alerts.append(f"หน้า {p['path']} ช้า {p.get('latency_ms')}ms")
+        br = overview.get("bounce_rate_pct", 0)
+        if isinstance(br, (int, float)) and br > 70:
+            alerts.append(f"Bounce rate สูงผิดปกติ {br}%")
 
-        ideas = [
-            "เพิ่ม uptime monitoring แบบ real-time บน dashboard",
-            "ปรับ meta description และ title tag เพื่อ SEO",
-            "เพิ่ม content ใหม่เกี่ยวกับ training pathway",
-        ]
-        log_agent("pixel", "scheduler", "[watch] done", summary[:200])
-        return _make_report("pixel", summary, ideas, alerts)
+        # ── Ideas ────────────────────────────────────────────────
+        ideas = []
+        if countries:
+            ideas.append(f"top location: {countries[0]['country']} — personalize content")
+        if top_pages:
+            ideas.append(f"หน้า '{top_pages[0]['page']}' popular — ใช้เป็น template")
+        ideas.append("สร้าง content calendar จาก traffic data รายสัปดาห์")
+
+        # ── Log analytics ให้ agent อื่นใช้ ─────────────────────
+        log_agent("pixel", "rocket",
+                  "analytics report พร้อมส่ง",
+                  f"sessions={overview.get('sessions',0)}, "
+                  f"top={countries[0]['country'] if countries else 'N/A'}")
+
+        report = _make_report("pixel", summary, ideas, alerts)
+        report["analytics_raw"] = {
+            "overview":  overview,
+            "countries": countries[:5],
+            "top_pages": top_pages[:5],
+        }
+        return report
 
     except Exception as e:
         log_agent("pixel", "scheduler", "[watch] error", str(e), status="error")

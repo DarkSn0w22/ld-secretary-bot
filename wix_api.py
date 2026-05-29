@@ -177,6 +177,157 @@ def update_cms_item(collection_id: str, item_id: str, data: dict) -> dict:
         return {"error": str(e)}
 
 
+def get_analytics_overview(days: int = 7) -> dict:
+    """ดึง site analytics overview — visitors, pageviews, sessions, locations"""
+    if not WIX_API_KEY or not WIX_SITE_ID:
+        return {"error": "WIX_API_KEY หรือ WIX_SITE_ID ไม่ได้ตั้งค่า"}
+    from datetime import datetime, timedelta
+    import pytz
+    end   = datetime.now(pytz.utc)
+    start = end - timedelta(days=days)
+
+    def fmt(dt):
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    result = {}
+
+    # ── 1) Traffic overview ──────────────────────────────────────
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/analytics/v2/reports/query",
+            headers=wix_headers(),
+            json={
+                "dateRange": {"startDate": fmt(start), "endDate": fmt(end)},
+                "metrics":   ["SESSIONS", "PAGE_VIEWS", "UNIQUE_VISITORS",
+                               "BOUNCE_RATE", "AVG_SESSION_DURATION"],
+                "dimensions": []
+            },
+            timeout=20
+        )
+        if resp.ok:
+            rows = resp.json().get("rows", [{}])
+            r = rows[0] if rows else {}
+            result["overview"] = {
+                "sessions":          r.get("SESSIONS", 0),
+                "page_views":        r.get("PAGE_VIEWS", 0),
+                "unique_visitors":   r.get("UNIQUE_VISITORS", 0),
+                "bounce_rate_pct":   round(float(r.get("BOUNCE_RATE", 0)) * 100, 1),
+                "avg_session_sec":   int(float(r.get("AVG_SESSION_DURATION", 0))),
+            }
+        else:
+            result["overview"] = {"error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+    except Exception as e:
+        result["overview"] = {"error": str(e)}
+
+    # ── 2) Top locations (countries) ────────────────────────────
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/analytics/v2/reports/query",
+            headers=wix_headers(),
+            json={
+                "dateRange": {"startDate": fmt(start), "endDate": fmt(end)},
+                "metrics":   ["SESSIONS", "UNIQUE_VISITORS"],
+                "dimensions": ["COUNTRY"],
+                "order":     [{"metric": "SESSIONS", "direction": "DESC"}],
+                "paging":    {"limit": 10}
+            },
+            timeout=20
+        )
+        if resp.ok:
+            rows = resp.json().get("rows", [])
+            result["top_countries"] = [
+                {
+                    "country":  r.get("COUNTRY", "Unknown"),
+                    "sessions": r.get("SESSIONS", 0),
+                    "visitors": r.get("UNIQUE_VISITORS", 0),
+                }
+                for r in rows
+            ]
+        else:
+            result["top_countries"] = []
+    except Exception as e:
+        result["top_countries"] = []
+
+    # ── 3) Top pages ─────────────────────────────────────────────
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/analytics/v2/reports/query",
+            headers=wix_headers(),
+            json={
+                "dateRange": {"startDate": fmt(start), "endDate": fmt(end)},
+                "metrics":   ["PAGE_VIEWS", "UNIQUE_VISITORS"],
+                "dimensions": ["PAGE_URL"],
+                "order":     [{"metric": "PAGE_VIEWS", "direction": "DESC"}],
+                "paging":    {"limit": 10}
+            },
+            timeout=20
+        )
+        if resp.ok:
+            rows = resp.json().get("rows", [])
+            result["top_pages"] = [
+                {
+                    "page":       r.get("PAGE_URL", "/"),
+                    "page_views": r.get("PAGE_VIEWS", 0),
+                    "visitors":   r.get("UNIQUE_VISITORS", 0),
+                }
+                for r in rows
+            ]
+        else:
+            result["top_pages"] = []
+    except Exception as e:
+        result["top_pages"] = []
+
+    # ── 4) Traffic sources ───────────────────────────────────────
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/analytics/v2/reports/query",
+            headers=wix_headers(),
+            json={
+                "dateRange": {"startDate": fmt(start), "endDate": fmt(end)},
+                "metrics":   ["SESSIONS"],
+                "dimensions": ["TRAFFIC_SOURCE"],
+                "order":     [{"metric": "SESSIONS", "direction": "DESC"}],
+                "paging":    {"limit": 8}
+            },
+            timeout=20
+        )
+        if resp.ok:
+            rows = resp.json().get("rows", [])
+            result["traffic_sources"] = [
+                {"source": r.get("TRAFFIC_SOURCE", "?"), "sessions": r.get("SESSIONS", 0)}
+                for r in rows
+            ]
+        else:
+            result["traffic_sources"] = []
+    except Exception as e:
+        result["traffic_sources"] = []
+
+    # ── 5) Device breakdown ──────────────────────────────────────
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/analytics/v2/reports/query",
+            headers=wix_headers(),
+            json={
+                "dateRange": {"startDate": fmt(start), "endDate": fmt(end)},
+                "metrics":   ["SESSIONS"],
+                "dimensions": ["DEVICE_TYPE"],
+            },
+            timeout=20
+        )
+        if resp.ok:
+            result["devices"] = [
+                {"device": r.get("DEVICE_TYPE", "?"), "sessions": r.get("SESSIONS", 0)}
+                for r in resp.json().get("rows", [])
+            ]
+        else:
+            result["devices"] = []
+    except Exception as e:
+        result["devices"] = []
+
+    result["period_days"] = days
+    return result
+
+
 def get_blog_posts(limit: int = 5) -> list:
     """Get recent blog posts from WIX Blog API"""
     if not WIX_API_KEY or not WIX_SITE_ID:
