@@ -103,9 +103,14 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 
 /* CENTER */
 .cpanel{display:flex;flex-direction:column;overflow:hidden;position:relative;}
-/* canvas height fixed — chat panel ใช้พื้นที่ที่เหลือ */
-#oc{display:block;flex-shrink:0;cursor:crosshair;image-rendering:pixelated;
-    height:240px !important;max-height:240px !important;}
+/* canvas takes all space, chat is thin strip */
+#oc{display:block;cursor:crosshair;image-rendering:auto;
+    flex:1;min-height:0;}
+/* agent chat — slim bar */
+#chat-con{
+  height:72px !important;min-height:72px !important;max-height:72px !important;
+  flex-shrink:0 !important;overflow:hidden;
+}
 
 /* CONSOLE */
 .con{flex:1;display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--border);}
@@ -636,10 +641,53 @@ let selId = null;
 let taskCount = 0;
 let scaleX = 1, scaleY = 1;
 
+// ─── Asset loading ───────────────────────────────────────────
+let bgImg = null, bgReady = false;
+let sprCanvas = null, spritesReady = false;
+
+(function loadAssets() {
+  // Office background
+  const bg = new Image();
+  bg.onload = () => { bgImg = bg; bgReady = true; };
+  bg.src = '/static/office_bg.png';
+
+  // Character sprites — remove white background on load
+  const spr = new Image();
+  spr.onload = () => {
+    const sc = document.createElement('canvas');
+    sc.width = spr.width; sc.height = spr.height;
+    const sctx = sc.getContext('2d');
+    sctx.drawImage(spr, 0, 0);
+    const id = sctx.getImageData(0, 0, spr.width, spr.height);
+    const d = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const r=d[i], g=d[i+1], b=d[i+2];
+      // white / near-white → transparent
+      if (r>210 && g>210 && b>210) {
+        const br = (r+g+b)/765;
+        d[i+3] = Math.round(Math.max(0, 1 - br*2.5) * 255);
+      }
+    }
+    sctx.putImageData(id, 0, 0);
+    sprCanvas = sc;
+    spritesReady = true;
+  };
+  spr.src = '/static/agents_sprites.png';
+})();
+
+// Sprite sheet: 4 cols × 3 rows, each cell 316×280
+const SPR_COLS=4, SPR_W=316, SPR_H=280;
+const SPRITE_IDX = {
+  rocket:0, atlas:1, pulse:2, guard:3,
+  sage:4, coin:5, sigma:6, people:7,
+  lex:8, rex:9, pixel:10, lens:11
+};
+
 function resizeCanvas() {
   const cp = canvas.parentElement;
-  const availW = cp.clientWidth || 600;
-  const availH = 240;   // fixed — chat panel fills the rest
+  const chatH = 72;
+  const availW = cp.clientWidth  || 600;
+  const availH = Math.max(180, (cp.clientHeight || 320) - chatH);
   canvas.style.width  = availW + 'px';
   canvas.style.height = availH + 'px';
   canvas.width  = availW;
@@ -667,45 +715,29 @@ function strokeRect(x,y,w,h,col,lw=1) {
 }
 
 function drawRoom() {
-  const floorGrad = ctx.createLinearGradient(0,0,0,canvas.height);
-  floorGrad.addColorStop(0,'#0b1020');
-  floorGrad.addColorStop(1,'#070a14');
-  ctx.fillStyle = floorGrad;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  const TW = px(40), TH = py(40);
-  for(let x=0;x<canvas.width;x+=TW){
-    for(let y=0;y<canvas.height;y+=TH){
-      const dark = (Math.round(x/TW)+Math.round(y/TH))%2===0;
-      ctx.fillStyle = dark ? 'rgba(79,158,255,0.03)' : 'rgba(0,0,0,0)';
-      ctx.fillRect(x,y,TW,TH);
-    }
+  if (bgReady && bgImg) {
+    // Draw real office background
+    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+    // subtle dark overlay to help characters stand out
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  } else {
+    // Fallback dark room while loading
+    ctx.fillStyle = '#060810';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(79,158,255,0.12)';
+    ctx.font = `${ps(7)}px 'Press Start 2P'`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Loading office...', canvas.width/2, canvas.height/2);
   }
-  ctx.strokeStyle = 'rgba(79,158,255,0.05)';
-  ctx.lineWidth = .5;
-  for(let x=0;x<canvas.width;x+=TW){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke(); }
-  for(let y=0;y<canvas.height;y+=TH){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke(); }
-
-  const wallH = py(28);
-  const wg = ctx.createLinearGradient(0,0,0,wallH);
-  wg.addColorStop(0,'#0c1525'); wg.addColorStop(1,'#080e1a');
-  ctx.fillStyle = wg;
-  ctx.fillRect(0,0,canvas.width,wallH);
-  ctx.strokeStyle = '#1a3060';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();ctx.moveTo(0,wallH);ctx.lineTo(canvas.width,wallH);ctx.stroke();
-
+  // OWNDAYS title
   ctx.save();
-  ctx.font = `${ps(7)}px 'Press Start 2P'`;
-  ctx.fillStyle = 'rgba(79,158,255,0.25)';
+  ctx.font = `${ps(6)}px 'Press Start 2P'`;
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.textAlign = 'center';
-  ctx.fillText('OWNDAYS ACADEMY — L&D THAILAND', canvas.width/2, py(16));
+  ctx.shadowBlur = ps(8); ctx.shadowColor = '#22d3ee';
+  ctx.fillText('OWNDAYS ACADEMY — L&D THAILAND', canvas.width/2, py(11));
   ctx.restore();
-
-  drawBookshelf(470, 3, 85, 22);
-  drawWindow(5, 3, 55, 22);
-  drawAC(430, 3, 35, 10);
-  drawMeetingTable(150, 210, 200, 45);
 }
 
 function drawBookshelf(x,y,w,h) {
@@ -787,27 +819,66 @@ function drawDesk(x,y,agent,occupied) {
 
 function drawChar(w) {
   const {x,y,agent,frame,dir,state,busy}=w, moving=state!=='sit';
-  ctx.save(); ctx.imageSmoothingEnabled=false;
-  ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(px(x),py(y)+ps(12),ps(7),ps(2.5),0,0,Math.PI*2);ctx.fill();
-  const ls=moving?(frame%2===0?ps(3):-ps(3)):0;
-  ctx.fillStyle='#1a2535';ctx.fillRect(px(x)-ps(5),py(y)+ps(2),ps(4),ps(7)+ls);ctx.fillRect(px(x)+ps(1),py(y)+ps(2),ps(4),ps(7)-ls);
-  ctx.fillStyle='#0a0f1a';ctx.fillRect(px(x)-ps(6),py(y)+ps(7)+ls,ps(5),ps(3));ctx.fillRect(px(x)+ps(1),py(y)+ps(7)-ls,ps(5),ps(3));
-  const bg2=ctx.createLinearGradient(0,py(y)-ps(8),0,py(y)+ps(4));bg2.addColorStop(0,agent.bodyCol);bg2.addColorStop(1,shadeColor(agent.bodyCol,-30));
-  ctx.fillStyle=bg2;ctx.fillRect(px(x)-ps(6),py(y)-ps(8),ps(12),ps(12));
-  ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(px(x)-ps(2),py(y)-ps(8),ps(4),ps(3));
-  const as=moving?(frame%2===0?ps(2.5):-ps(2.5)):0;
-  ctx.fillStyle=agent.bodyCol;ctx.fillRect(px(x)-ps(10),py(y)-ps(6)+as,ps(4),ps(8));ctx.fillRect(px(x)+ps(6),py(y)-ps(6)-as,ps(4),ps(8));
-  ctx.fillStyle='#f5c9a0';ctx.fillRect(px(x)-ps(10),py(y)+ps(1)+as,ps(4),ps(4));ctx.fillRect(px(x)+ps(6),py(y)+ps(1)-as,ps(4),ps(4));
-  ctx.fillRect(px(x)-ps(2),py(y)-ps(10),ps(4),ps(3));ctx.fillRect(px(x)-ps(6),py(y)-ps(20),ps(12),ps(12));
-  ctx.fillStyle=agent.hairCol;ctx.fillRect(px(x)-ps(6),py(y)-ps(20),ps(12),ps(4));ctx.fillRect(px(x)-ps(7),py(y)-ps(20),ps(2),ps(8));
-  if(dir!=='up'){
-    ctx.fillStyle='#0a0a1a';ctx.fillRect(px(x)-ps(4),py(y)-ps(15),ps(2),ps(2.5));ctx.fillRect(px(x)+ps(2),py(y)-ps(15),ps(2),ps(2.5));
-    ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillRect(px(x)-ps(3.5),py(y)-ps(15),ps(1),ps(1));ctx.fillRect(px(x)+ps(2.5),py(y)-ps(15),ps(1),ps(1));
-    ctx.fillStyle=busy?'#ff9070':'#c87070';ctx.fillRect(px(x)-ps(1.5),py(y)-ps(11),ps(3),ps(1));
+  ctx.save();
+
+  // Ground shadow
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.beginPath();
+  ctx.ellipse(px(x), py(y)+ps(9), ps(9), ps(2.5), 0, 0, Math.PI*2);
+  ctx.fill();
+
+  if (spritesReady && sprCanvas) {
+    const idx = SPRITE_IDX[agent.id] ?? 0;
+    const sc = idx % SPR_COLS;
+    const sr = Math.floor(idx / SPR_COLS);
+    const sx = sc * SPR_W, sy = sr * SPR_H;
+
+    // Character display size
+    const dH = ps(52);
+    const dW = dH * (SPR_W / SPR_H);
+
+    // Walking bob
+    const bob = moving ? (frame%2===0 ? -ps(2) : ps(0.5)) : 0;
+    const glow = busy ? Math.sin(Date.now()/220)*ps(2) : 0;
+    const drawX = px(x) - dW/2;
+    const drawY = py(y) - dH + bob + glow;
+
+    // Busy aura
+    if (busy) {
+      ctx.save();
+      ctx.globalAlpha = 0.18 + 0.08*Math.sin(Date.now()/300);
+      ctx.shadowBlur = ps(18); ctx.shadowColor = agent.color;
+      ctx.fillStyle = agent.color;
+      ctx.beginPath();
+      ctx.ellipse(px(x), drawY+dH*0.55, dW*0.45, dH*0.45, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Flip horizontally when moving left
+    ctx.imageSmoothingEnabled = true;
+    if (dir === 'left') {
+      ctx.translate(px(x)*2, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(sprCanvas, sx, sy, SPR_W, SPR_H, drawX, drawY, dW, dH);
+
+  } else {
+    // Fallback emoji while sprites load
+    const bob = moving ? (frame%2===0 ? -ps(3) : 0) : 0;
+    ctx.font = `${ps(14)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(agent.em, px(x), py(y)-ps(12)+bob);
   }
-  ctx.font=`${ps(10)}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-  const bounce=busy?Math.sin(Date.now()/200)*ps(1.5):0;ctx.fillText(agent.em,px(x),py(y)-ps(26)+bounce);
-  if(busy){ctx.save();ctx.globalAlpha=0.15+0.1*Math.sin(Date.now()/300);ctx.shadowBlur=ps(20);ctx.shadowColor=agent.color;ctx.fillStyle=agent.color;ctx.beginPath();ctx.arc(px(x),py(y)-ps(8),ps(12),0,Math.PI*2);ctx.fill();ctx.restore();}
+
+  // Emoji hat floating above character
+  const emBounce = busy ? Math.sin(Date.now()/200)*ps(2) : 0;
+  ctx.font = `${ps(9)}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(agent.em, px(x), py(y)-ps(50)+emBounce);
+
   ctx.restore();
 }
 
