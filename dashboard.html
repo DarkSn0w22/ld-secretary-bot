@@ -205,7 +205,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
     </div>
   </div>
   <div class="hstats">
-    <div class="hs"><div class="hsv" style="color:var(--blue)">11</div><div class="hsl">Agents</div></div>
+    <div class="hs"><div class="hsv" style="color:var(--blue)">12</div><div class="hsl">Agents</div></div>
     <div class="hs"><div class="hsv" id="hon" style="color:var(--green)">--</div><div class="hsl">Online</div></div>
     <div class="hs"><div class="hsv" id="htsk" style="color:var(--yellow)">0</div><div class="hsl">Tasks</div></div>
     <div class="hs"><div class="hsv" style="color:var(--purple)">73</div><div class="hsl">Branches</div></div>
@@ -256,6 +256,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
           <option value="pixel">🖥️ Pixel</option>
           <option value="sigma">📈 Sigma</option>
           <option value="lens">🎨 Lens</option>
+          <option value="rex">🏬 Rex</option>
         </select>
         <input class="cinput" id="cmd" placeholder="พิมพ์คำสั่งให้ agent..."
                onkeydown="if(event.key==='Enter')doSend()"/>
@@ -310,6 +311,7 @@ const AGENTS = [
   {id:'pixel',  name:'Pixel',  em:'🖥️', role:'Web Admin',       color:'#38bdf8', bodyCol:'#0a2a4a', hairCol:'#0a0a2a', tools:['Page Check','Content','UX']},
   {id:'sigma',  name:'Sigma',  em:'📈', role:'Data Analyst',    color:'#4ade80', bodyCol:'#0a3a0a', hairCol:'#1a3a0a', tools:['Trends','KPI','Benchmark']},
   {id:'lens',   name:'Lens',   em:'🎨', role:'Creator AI',      color:'#f9a8d4', bodyCol:'#4a1a3a', hairCol:'#0a0a0a', tools:['Content','Quiz','Script']},
+  {id:'rex',    name:'Rex',    em:'🏬', role:'Retail MD',        color:'#f97316', bodyCol:'#4a1e0a', hairCol:'#1a0a00', tools:['Sales File','Branch KPI','Training Link']},
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -334,6 +336,7 @@ const DESK_POSITIONS = [
   {x:380, y:160}, // Pixel
   {x:480, y:160}, // Sigma
   {x:190, y:230}, // Lens — meeting table
+  {x:370, y:230}, // Rex — meeting table (ฝั่งขวา)
 ];
 
 // ═══════════════════════════════════════════════════════════════

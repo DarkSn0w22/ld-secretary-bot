@@ -38,6 +38,7 @@ AGENT_MODELS = {
     "pixel":  SONNET,   # Web Admin — monitoring งานพื้นฐาน
     "sigma":  SONNET,   # Data Analyst — อัปเป็น OPUS ได้ถ้าวิเคราะห์เชิงลึก
     "lens":   SONNET,   # Creator — content/quiz
+    "rex":    SONNET,   # Retail MD — sales analysis, branch performance
     "scheduler": SONNET # งานอัตโนมัติ (Daily Brief ฯลฯ)
 }
 
