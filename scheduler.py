@@ -1,7 +1,7 @@
 """
-Scheduler — Consolidated Morning Report
-ทุกวัน 09:00: Rocket สรุปรายงานจากทุก agent ส่งครั้งเดียว
-(ยกเลิกการส่งแยกของ Coin/People/Sage/Daily Brief แยก)
+Scheduler — Morning Report + Autonomous 4-hour Watch Cycle
+09:00: Rocket consolidated morning report
+08:00/12:00/16:00/20:00 จ-ศ: Autonomous agent watch cycle (ทุก 4 ชั่วโมง)
 """
 
 import os
@@ -135,6 +135,10 @@ def consolidated_morning_report() -> str:
 ACTIVITY_DIGEST_HOURS = [11, 15, 19]   # 11:00, 15:00, 19:00
 _last_activity_epoch = 0.0             # epoch ของ log ล่าสุดที่ส่งไปแล้ว
 
+# ── Autonomous watch cycle config ────────────────────────────────
+# รัน agent watch ทุก 4 ชั่วโมง (08:00 / 12:00 / 16:00 / 20:00) จ-ศ
+WATCH_HOURS = [8, 12, 16, 20]
+
 
 def build_activity_digest() -> str | None:
     """สร้างสรุปกิจกรรม agents ตั้งแต่ครั้งสุดท้าย — คืน None ถ้าไม่มีอะไรใหม่"""
@@ -205,19 +209,34 @@ def build_activity_digest() -> str | None:
                 f"รวม {len(real_calls)} tasks ในช่วงที่ผ่านมาครับ")
 
 
+def run_watch_cycle_background():
+    """รัน autonomous watch cycle ใน background thread"""
+    try:
+        from autonomous_agents import run_watch_cycle
+        print("[Scheduler] Launching watch cycle...")
+        run_watch_cycle(user_id=PEANUT_USER_ID)
+        print("[Scheduler] Watch cycle completed ✓")
+    except Exception as e:
+        print(f"[Scheduler] Watch cycle error: {e}")
+        log_agent("scheduler", "system", "[watch-cycle] error", str(e), status="error")
+
+
 def scheduler_loop():
-    print("Scheduler started — morning report 09:00 + activity digests 11:00/15:00/19:00")
+    print("Scheduler started — morning report 09:00 + activity digests 11:00/15:00/19:00 "
+          "+ autonomous watch 08:00/12:00/16:00/20:00")
     sent_today = None
     sent_digest_hours = set()   # เซ็ต hours ที่ส่ง digest ไปแล้วในวันนี้
+    sent_watch_hours = set()    # เซ็ต hours ที่ trigger watch cycle ไปแล้วในวันนี้
 
     while True:
         now = datetime.now(BANGKOK_TZ)
         today = now.date()
         weekday = now.weekday()
 
-        # รีเซ็ต digest tracker เมื่อขึ้นวันใหม่
+        # รีเซ็ต trackers เมื่อขึ้นวันใหม่
         if sent_today != today:
             sent_digest_hours = set()
+            sent_watch_hours = set()
 
         # ── Morning Report 09:00 จ-ศ ────────────────────────────
         if (now.hour == MORNING_HOUR and
@@ -250,6 +269,20 @@ def scheduler_loop():
                     print(f"[Scheduler] No new activity at {now.hour}:00 — skip")
             except Exception as e:
                 print(f"[Scheduler] Activity digest error: {e}")
+
+        # ── Autonomous Watch Cycle 08:00 / 12:00 / 16:00 / 20:00 จ-ศ ──
+        if (now.hour in WATCH_HOURS and
+                now.minute == 0 and
+                weekday in WORK_DAYS and
+                now.hour not in sent_watch_hours):
+            print(f"[Scheduler] Triggering autonomous watch cycle at {now.hour}:00...")
+            sent_watch_hours.add(now.hour)  # mark ก่อนเพื่อป้องกัน double-trigger
+            watch_thread = threading.Thread(
+                target=run_watch_cycle_background,
+                daemon=True,
+                name=f"watch-cycle-{now.hour:02d}"
+            )
+            watch_thread.start()
 
         time.sleep(30)
 

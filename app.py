@@ -30,6 +30,7 @@ from retail_md_agent import run_retail_md, download_line_file, parse_excel_to_te
 from models_config import print_model_summary
 from agent_log import log_agent, get_logs, clear_logs
 from agent_bus import bus
+from autonomous_agents import start_autonomous_watchers
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
@@ -831,6 +832,7 @@ def _start_agent_bus():
 
 _start_agent_bus()
 start_scheduler()
+start_autonomous_watchers()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
