@@ -103,7 +103,9 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 
 /* CENTER */
 .cpanel{display:flex;flex-direction:column;overflow:hidden;position:relative;}
-#oc{display:block;flex-shrink:0;cursor:crosshair;image-rendering:pixelated;}
+/* canvas height fixed — chat panel ใช้พื้นที่ที่เหลือ */
+#oc{display:block;flex-shrink:0;cursor:crosshair;image-rendering:pixelated;
+    height:240px !important;max-height:240px !important;}
 
 /* CONSOLE */
 .con{flex:1;display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--border);}
@@ -301,8 +303,8 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
       <!-- CENTER: canvas + embedded agent chat -->
       <div class="cpanel">
         <canvas id="oc"></canvas>
-        <!-- Agent Chat replaces System Console on this page -->
-        <div class="con" id="chat-con">
+        <!-- Agent Chat fills remaining space below canvas -->
+        <div class="con" id="chat-con" style="flex:1;min-height:0;display:flex;flex-direction:column;">
           <div class="ph" style="flex-shrink:0;">
             💬 Agent Chat
             <span id="chat-live" style="font-size:9px;color:var(--green)">● LIVE</span>
@@ -564,8 +566,8 @@ let scaleX = 1, scaleY = 1;
 
 function resizeCanvas() {
   const cp = canvas.parentElement;
-  const availW = cp.clientWidth;
-  const availH = Math.min(cp.clientHeight * 0.46, 300);
+  const availW = cp.clientWidth || 600;
+  const availH = 240;   // fixed — chat panel fills the rest
   canvas.style.width  = availW + 'px';
   canvas.style.height = availH + 'px';
   canvas.width  = availW;
@@ -573,6 +575,7 @@ function resizeCanvas() {
   scaleX = availW / DW;
   scaleY = availH / DH;
 }
+window.addEventListener('resize', resizeCanvas);
 
 // ═══════════════════════════════════════════════════════════════
 //  DRAW HELPERS
