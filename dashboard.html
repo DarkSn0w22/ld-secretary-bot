@@ -642,36 +642,47 @@ let taskCount = 0;
 let scaleX = 1, scaleY = 1;
 
 // ─── Asset loading ───────────────────────────────────────────
-let bgImg = null, bgReady = false;
-let sprCanvas = null, spritesReady = false;
+let bgImg = null,  bgReady = false;
+let rawSprImg = null;  // raw sprite Image
+const agentSprites = {};  // agent_id → processed canvas (white removed)
+let spritesReady = false;
 
+// ── Build per-agent sprite canvases (80×80 each) ────────────────
+function buildAgentSprites(sprImg) {
+  AGENTS.forEach(a => {
+    const idx = SPRITE_IDX[a.id];
+    if (idx === undefined) return;
+    const sx = (idx % SPR_COLS) * SPR_W;
+    const sy = Math.floor(idx / SPR_COLS) * SPR_H;
+    const W = 100, H = 100;
+    const sc = document.createElement('canvas');
+    sc.width = W; sc.height = H;
+    const sctx = sc.getContext('2d');
+    sctx.drawImage(sprImg, sx, sy, SPR_W, SPR_H, 0, 0, W, H);
+    try {
+      const id = sctx.getImageData(0, 0, W, H);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i]>215 && d[i+1]>215 && d[i+2]>215) d[i+3] = 0;
+      }
+      sctx.putImageData(id, 0, 0);
+    } catch(e) { /* CORS fallback: keep original pixels */ }
+    agentSprites[a.id] = sc;
+  });
+  spritesReady = true;
+  console.log('[Sprites] ready', Object.keys(agentSprites).length, 'agents');
+}
+
+// ── Load both assets ────────────────────────────────────────────
 (function loadAssets() {
-  // Office background
   const bg = new Image();
-  bg.onload = () => { bgImg = bg; bgReady = true; };
+  bg.onload  = () => { bgImg = bg; bgReady = true; console.log('[BG] ready'); };
+  bg.onerror = () => console.error('[BG] load failed');
   bg.src = '/static/office_bg.png';
 
-  // Character sprites — remove white background on load
   const spr = new Image();
-  spr.onload = () => {
-    const sc = document.createElement('canvas');
-    sc.width = spr.width; sc.height = spr.height;
-    const sctx = sc.getContext('2d');
-    sctx.drawImage(spr, 0, 0);
-    const id = sctx.getImageData(0, 0, spr.width, spr.height);
-    const d = id.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const r=d[i], g=d[i+1], b=d[i+2];
-      // white / near-white → transparent
-      if (r>210 && g>210 && b>210) {
-        const br = (r+g+b)/765;
-        d[i+3] = Math.round(Math.max(0, 1 - br*2.5) * 255);
-      }
-    }
-    sctx.putImageData(id, 0, 0);
-    sprCanvas = sc;
-    spritesReady = true;
-  };
+  spr.onload  = () => { rawSprImg = spr; buildAgentSprites(spr); };
+  spr.onerror = () => console.error('[Sprites] load failed');
   spr.src = '/static/agents_sprites.png';
 })();
 
@@ -827,17 +838,11 @@ function drawChar(w) {
   ctx.ellipse(px(x), py(y)+ps(9), ps(9), ps(2.5), 0, 0, Math.PI*2);
   ctx.fill();
 
-  if (spritesReady && sprCanvas) {
-    const idx = SPRITE_IDX[agent.id] ?? 0;
-    const sc = idx % SPR_COLS;
-    const sr = Math.floor(idx / SPR_COLS);
-    const sx = sc * SPR_W, sy = sr * SPR_H;
-
-    // Character display size
+  const spr = agentSprites[agent.id];
+  if (spritesReady && spr) {
     const dH = ps(52);
-    const dW = dH * (SPR_W / SPR_H);
+    const dW = dH;  // square crop (100×100)
 
-    // Walking bob
     const bob = moving ? (frame%2===0 ? -ps(2) : ps(0.5)) : 0;
     const glow = busy ? Math.sin(Date.now()/220)*ps(2) : 0;
     const drawX = px(x) - dW/2;
@@ -850,18 +855,17 @@ function drawChar(w) {
       ctx.shadowBlur = ps(18); ctx.shadowColor = agent.color;
       ctx.fillStyle = agent.color;
       ctx.beginPath();
-      ctx.ellipse(px(x), drawY+dH*0.55, dW*0.45, dH*0.45, 0, 0, Math.PI*2);
+      ctx.ellipse(px(x), drawY+dH*0.6, dW*0.42, dH*0.42, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
     }
 
-    // Flip horizontally when moving left
     ctx.imageSmoothingEnabled = true;
     if (dir === 'left') {
       ctx.translate(px(x)*2, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(sprCanvas, sx, sy, SPR_W, SPR_H, drawX, drawY, dW, dH);
+    ctx.drawImage(spr, 0, 0, 100, 100, drawX, drawY, dW, dH);
 
   } else {
     // Fallback emoji while sprites load
