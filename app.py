@@ -28,6 +28,7 @@ from data_agent import run_data_analyst
 from creator_agent import run_creator
 from retail_md_agent import run_retail_md, download_line_file, parse_excel_to_text, parse_pdf_sales_report
 from models_config import print_model_summary
+from agent_log import log_agent, get_logs, clear_logs
 
 app = Flask(__name__)
 
@@ -587,17 +588,36 @@ def api_agent():
         return jsonify({"error": "ไม่มีคำสั่ง"}), 400
 
     try:
+        log_agent("dashboard", agent, task)
         if agent == "rocket":
-            # Rocket = เลขาหลัก ใช้ flow เต็ม (memory + tools)
             result = get_claude_response(DASHBOARD_USER_ID, task)
         elif agent in DASHBOARD_AGENTS:
             result = DASHBOARD_AGENTS[agent](task)
         else:
             return jsonify({"error": f"ไม่รู้จัก agent: {agent}"}), 400
+        log_agent(agent, "dashboard", "", result[:300])
         return jsonify({"result": result})
     except Exception as e:
         print(f"api_agent error ({agent}): {e}")
+        log_agent(agent, "dashboard", "", f"ERROR: {e}", status="error")
         return jsonify({"error": f"ระบบขัดข้อง: {e}"}), 500
+
+
+@app.route("/api/agent-log", methods=["GET"])
+def api_agent_log():
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    since = request.args.get("since", 0, type=float)
+    logs = get_logs(n=100, since_epoch=since)
+    return jsonify({"logs": logs})
+
+
+@app.route("/api/agent-log/clear", methods=["POST"])
+def api_agent_log_clear():
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    clear_logs()
+    return jsonify({"ok": True})
 
 
 # Start scheduler

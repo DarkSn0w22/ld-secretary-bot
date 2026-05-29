@@ -93,8 +93,18 @@ def run_reporter(task: str = "weekly") -> str:
     return report
 
 
+def get_training_summary_text(full: bool = False) -> str:
+    """คืน training summary เป็น text — สำหรับ consolidated morning report"""
+    try:
+        data = get_all_dashboard()
+        task = "weekly" if full else "highlight"
+        return generate_report(data, task)[:600]
+    except Exception as e:
+        return f"ดึงข้อมูลไม่ได้: {e}"
+
+
 def send_scheduled_report(report_type: str = "weekly"):
-    """ส่งรายงานอัตโนมัติ push ไปที่ LINE"""
+    """(legacy) ส่งรายงานอัตโนมัติ push ไปที่ LINE แยก"""
     print(f"Sage sending scheduled {report_type} report...")
 
     data = get_all_dashboard()

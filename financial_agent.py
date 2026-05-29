@@ -242,8 +242,26 @@ def run_financial_manager(task, context=""):
         return f"Coin มีปัญหาชั่วคราวครับ: {str(e)}"
 
 
+def get_budget_summary_text() -> str:
+    """คืน budget status เป็น text — สำหรับ consolidated morning report"""
+    try:
+        raw = fetch_dashboard("cost")
+        alerts = check_budget_alerts(raw)
+        if not alerts:
+            overall = raw.get("actual", 0)
+            budget  = raw.get("budget", 1)
+            pct = overall / budget * 100 if budget else 0
+            return f"ปกติครับ ใช้ไป {pct:.1f}% ยังไม่มีหมวดเกิน 80%"
+        lines = [f"⚠️ Alert {len(alerts)} หมวดเกิน 80%:"]
+        for a in alerts:
+            lines.append(f"  {a['name']}: {a['pct']:.1f}% (฿{a['actual']:,.0f}/฿{a['budget']:,.0f})")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"ดึงข้อมูลไม่ได้: {e}"
+
+
 def run_daily_budget_check():
-    """เช็ค budget alert อัตโนมัติทุกวัน"""
+    """(legacy) เช็ค budget alert แล้วส่ง LINE แยก"""
     print("Coin running daily budget check...")
     raw = fetch_dashboard("cost")
     alerts = check_budget_alerts(raw)

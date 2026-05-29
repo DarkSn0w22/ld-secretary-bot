@@ -322,7 +322,19 @@ def run_hr_manager(task, context=""):
         return f"People มีปัญหาชั่วคราวครับ: {str(e)}"
 
 
-def check_probation_alerts():
+def get_probation_summary_text() -> str:
+    """คืน probation status เป็น text — สำหรับ consolidated morning report"""
+    try:
+        from datetime import date, timedelta
+        from sheets_tools import get_oar_summary
+        # reuse logic จาก check_probation_alerts แต่คืน text แทน push LINE
+        result = check_probation_alerts(return_text=True)
+        return result if result else "ไม่มีพนักงานหมด probation ใน 7 วันครับ"
+    except Exception as e:
+        return f"ดึงข้อมูลไม่ได้: {e}"
+
+
+def check_probation_alerts(return_text: bool = False):
     """เช็ค probation ที่จะหมดใน 7 วัน — รันทุกวัน"""
     print("People checking probation expiry...")
     employees = get_sheet_data("Employee")
@@ -355,13 +367,17 @@ def check_probation_alerts():
             continue
 
     if expiring_soon:
-        msg = f"⚠️ แจ้งเตือน Probation จาก People\n\nพนักงานหมด probation ใน 7 วัน: {len(expiring_soon)} คน\n\n"
+        msg = f"⚠️ พนักงานหมด probation ใน 7 วัน: {len(expiring_soon)} คน\n"
         for e in expiring_soon:
             msg += (f"👤 {e['name']} | {e['position']}\n"
                     f"   สาขา: {e['branch']}\n"
-                    f"   หมด: {e['end_date']} (อีก {e['days_left']} วัน)\n\n")
-        msg += "กรุณาตรวจสอบและดำเนินการ confirm หรือ terminate ครับ 🙏"
-        push_line_message(msg)
+                    f"   หมด: {e['end_date']} (อีก {e['days_left']} วัน)\n")
+        msg += "กรุณา confirm หรือ terminate ครับ"
+        if return_text:
+            return msg
+        push_line_message("⚠️ แจ้งเตือน Probation จาก People\n\n" + msg)
         print(f"People: {len(expiring_soon)} probation alerts sent")
     else:
         print("People: No probation expiring in 7 days")
+        if return_text:
+            return "ไม่มีพนักงานหมด probation ใน 7 วันครับ"
