@@ -67,6 +67,25 @@ Robinson Prachinburi, Robinson Phetchaburi, Central Park, The Central Phaholyoth
 - Sage (Reporter): ให้ Sage จัดทำรายงานสรุปสำหรับผู้บริหาร
 - Guard (QA): ให้ Guard ตรวจสอบรายงานก่อนส่ง
 
+รูปแบบไฟล์ที่รองรับ:
+- PDF: OWNDAYS Weekly Sales Report (parse แล้วได้ตาราง column structure ด้านล่าง)
+- Excel (.xlsx/.xls): Sales data แบบ spreadsheet
+- CSV / Text table: ข้อมูลแบบ plain text
+
+PDF Column Guide (OWNDAYS format):
+No=Rank | Code=รหัสสาขา | Name=ชื่อสาขา | Budget=เป้าสัปดาห์ | Sales=ยอดจริง |
+CX=transactions | ATV=ยอดเฉลี่ย/บิล | Achiev%=achievement | Chock=อันดับรวม |
+FF=Footfall(คนเข้าร้าน) | Engagers=คนที่ถูก engage | Engager%=FF→Engage rate |
+CVR%=Conversion Rate(Engage→ซื้อ) | >1-15m=อยู่ร้าน 1-15นาที | >15m=อยู่ร้าน>15นาที |
+MP=จำนวนพนักงาน | S/HC=ยอดต่อพนักงาน | SPH=ยอดต่อชั่วโมง |
+WArea%=% ของพื้นที่ | W%=% ของทั้งประเทศ
+
+สัญญาณเตือนที่ควร flag:
+- Achiev% < 85% = ต่ำกว่าเป้าอย่างมีนัยสำคัญ
+- CVR% < 20% = conversion ต่ำผิดปกติ (ปกติควร 25-35%)
+- Engager% < 80% = staff ไม่ออกหาลูกค้าพอ
+- ATV < 3,500 = ยอดต่อบิลต่ำ (ปกติ 4,000+)
+
 กฎการตอบ:
 - ตอบภาษาไทย plain text ไม่ใช้ Markdown (ห้ามใช้ ** ## __ เด็ดขาด)
 - ใช้คำลงท้าย "ครับ" สไตล์ MD ที่มีอำนาจ ตัดสินใจเด็ด ข้อมูลครบ
@@ -392,7 +411,204 @@ def parse_excel_to_text(file_bytes: bytes) -> str:
             rows.append(",".join([str(c) if c is not None else "" for c in row]))
         return "\n".join(rows)
     except ImportError:
-        # ถ้าไม่มี openpyxl ใช้ CSV fallback
         return file_bytes.decode("utf-8", errors="replace")
     except Exception as e:
         return f"แปลงไฟล์ไม่ได้: {e}"
+
+
+def parse_pdf_sales_report(pdf_bytes: bytes) -> str:
+    """แปลง OWNDAYS PDF Weekly Sales Report เป็น structured text สำหรับ Rex
+
+    รองรับ format มาตรฐาน: ODTH [date] Weekly Sales Report.pdf
+    ใช้ auto-detect header + cluster-based y-grouping เพื่อรองรับ layout หลายแบบ
+    """
+    try:
+        import fitz
+    except ImportError:
+        return "ต้องการ pymupdf: pip install pymupdf"
+
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        total_pages = len(doc)
+
+        COLUMNS_GUIDE = (
+            "OWNDAYS Weekly Sales Report — Column Guide:\n"
+            "No=Rank | Code=รหัสสาขา | Name=ชื่อสาขา | Budget=เป้าสัปดาห์ | "
+            "Sales=ยอดขายจริง | CX=จำนวน transaction | ATV=ยอดเฉลี่ย/บิล | "
+            "Achiev%=achievement(Sales÷Budget) | Chock=อันดับรวม | "
+            "FF=Footfall(คนเข้าร้าน) | Engagers=คนที่ถูก engage | "
+            "Engager%=FF→Engage rate | CVR%=Conversion Rate(Engage→ซื้อ) | "
+            "MP=จำนวนพนักงาน | S/HC=ยอดต่อพนักงาน"
+        )
+
+        KEY_COLS = ["No", "Code", "Name", "Budget", "Sales", "CX", "ATV",
+                    "Achiev%", "Chock", "FF", "Engagers", "Engager%", "CVR%", "MP", "S/HC"]
+
+        def extract_branches_from_page(page):
+            """ดึง branches โดย detect column positions จาก header row (รองรับ layout ทุกแบบ)"""
+            words = list(page.get_text("words"))
+
+            # หา Budget header เป็น anchor หลัก (เลือกตำแหน่ง y น้อยสุด = บนสุด)
+            budget_items = [(x0, y0) for x0, y0, x1, y1, word, *_ in words
+                            if word == "Budget" and y0 < 200]
+            if not budget_items:
+                return []
+            _, budget_y = min(budget_items, key=lambda t: t[1])
+
+            # รวบรวม header words ภายใน ±10px ของ budget_y (เฉพาะ table area x<430)
+            hband = [(x0, word) for x0, y0, x1, y1, word, *_ in words
+                     if abs(y0 - budget_y) < 10 and x0 < 430]
+
+            # สร้าง anchors จาก header keywords
+            anchors = {}
+            seen_engagers = []
+            for x0, word in hband:
+                if word == "Budget":          anchors["Budget"]   = x0
+                elif word == "Sales":         anchors["Sales"]    = x0
+                elif word == "ATV":           anchors["ATV"]      = x0
+                elif word == "FF":            anchors["FF"]       = x0
+                elif word == "MP":            anchors["MP"]       = x0
+                elif word == "S/HC":          anchors["S/HC"]     = x0
+                elif word == "CVR":           anchors.setdefault("CVR%", x0)
+                elif word in ("Cx", "CX"):   anchors["CX"]       = x0
+                elif word == "Engagers":     seen_engagers.append(x0)
+
+            # Achiev% = "%" ก่อน FF column
+            ff_x = anchors.get("FF", 999)
+            for x0, word in hband:
+                if word == "%" and x0 < ff_x:
+                    anchors["Achiev%"] = x0
+                    break
+
+            # Engagers (ตัวแรก) และ Engager% (ตัวที่สอง)
+            seen_engagers.sort()
+            if len(seen_engagers) >= 1: anchors["Engagers"]  = seen_engagers[0]
+            if len(seen_engagers) >= 2: anchors["Engager%"]  = seen_engagers[1]
+            elif "Engagers" in anchors: anchors["Engager%"]  = anchors["Engagers"] + 15
+
+            # No. และ Code อาจอยู่ห่าง y จาก budget_y เล็กน้อย → ขยาย range ±15px
+            for x0, y0, x1, y1, word, *_ in words:
+                if abs(y0 - budget_y) < 15:
+                    if word in ("No.", "No") and "No" not in anchors:
+                        anchors["No"] = x0
+                    elif word == "Code" and "Code" not in anchors:
+                        anchors["Code"] = x0
+
+            # Name column เริ่มต่อจาก Code (data ชื่อสาขาอยู่ซ้ายของ header SHOP)
+            code_x = anchors.get("Code", anchors.get("No", 22) + 10)
+            anchors["Name"] = code_x + 10
+
+            # Chock อยู่ระหว่าง Achiev% และ FF
+            if "Achiev%" in anchors and "FF" in anchors:
+                anchors["Chock"] = anchors["Achiev%"] + 17
+
+            # สร้าง col_ranges จาก anchors เรียงตาม x
+            present = sorted([(c, anchors[c]) for c in KEY_COLS if c in anchors],
+                             key=lambda t: t[1])
+
+            # คำนวณ left[i] = anchor[i] - buf[i]
+            # buf = min(gap_to_prev * 0.6, 8), Name ไม่มี buffer (data เริ่มตรง anchor)
+            # right[i] = left[i+1] → non-overlapping ranges
+            lefts = []
+            for i, (col, ax) in enumerate(present):
+                if col == "Name":
+                    buf = 0
+                elif i == 0:
+                    buf = 2
+                else:
+                    gap = ax - present[i - 1][1]
+                    buf = min(gap * 0.6, 8)
+                lefts.append(ax - buf)
+
+            col_ranges = {}
+            for i, (col, _) in enumerate(present):
+                right = lefts[i + 1] if i + 1 < len(present) else present[i][1] + 45
+                col_ranges[col] = (lefts[i], right)
+
+            # data_y_start: หลัง sub-header "Chock"
+            data_y_start = budget_y + 8
+            for x0, y0, x1, y1, word, *_ in words:
+                if word == "Chock" and y0 > budget_y:
+                    data_y_start = max(data_y_start, y0 + 4)
+                    break
+
+            x_max_data = col_ranges.get("S/HC", (390, 432))[1]
+
+            # Extract data words และ cluster เป็น rows
+            data_words = [(x0, y0, word)
+                          for x0, y0, x1, y1, word, *_ in words
+                          if x0 < x_max_data and y0 > data_y_start]
+            data_words.sort(key=lambda w: (w[1], w[0]))
+            if not data_words:
+                return []
+
+            clusters = []
+            cur = [data_words[0]]
+            for w in data_words[1:]:
+                if w[1] - cur[-1][1] > 2.5:
+                    clusters.append(cur)
+                    cur = [w]
+                else:
+                    cur.append(w)
+            clusters.append(cur)
+
+            # แปลง clusters → branch rows
+            branches = []
+            nr = col_ranges.get("No")
+            if not nr:
+                return []
+            for cluster in clusters:
+                no_ws = [w for x0, _, w in cluster if nr[0] <= x0 < nr[1]]
+                no_val = " ".join(no_ws).strip()
+                if not no_val.isdigit():
+                    continue
+                row = {"No": no_val}
+                for col in KEY_COLS[1:]:
+                    if col not in col_ranges:
+                        row[col] = "-"
+                        continue
+                    xlo, xhi = col_ranges[col]
+                    ws = [w for x0, _, w in cluster if xlo <= x0 < xhi]
+                    row[col] = (" ".join(ws) if col == "Name" else (ws[0] if ws else "-"))
+                branches.append(row)
+            return branches
+
+        output = []
+        output.append(f"=== OWNDAYS Sales Report PDF — {total_pages} pages ===")
+        output.append(COLUMNS_GUIDE)
+        output.append("")
+
+        # Page 1: All branches summary
+        page1 = doc[0]
+        branches_p1 = extract_branches_from_page(page1)
+        output.append("=== Page 1: All Branches Weekly Summary (เรียงตาม Rank) ===")
+        output.append(" | ".join(KEY_COLS))
+        output.append("-" * 110)
+        for row in branches_p1:
+            output.append(" | ".join(row.get(c, "-") for c in KEY_COLS))
+        output.append(f"\nรวม {len(branches_p1)} สาขา")
+
+        # Area summary pages
+        area_found = 0
+        output.append("\n=== Area Summary Pages ===")
+        for pg_idx in range(1, min(total_pages, 25)):
+            page = doc[pg_idx]
+            text = page.get_text()
+            if "Achievement" in text and "Budget" in text and "Sales" in text:
+                branch_rows = extract_branches_from_page(page)
+                if len(branch_rows) >= 2:
+                    output.append(f"\n--- Area Page {pg_idx + 1} ({len(branch_rows)} branches) ---")
+                    output.append(" | ".join(KEY_COLS))
+                    for row in branch_rows:
+                        output.append(" | ".join(row.get(c, "-") for c in KEY_COLS))
+                    area_found += 1
+                if area_found >= 6:
+                    break
+
+        doc.close()
+        result = "\n".join(output)
+        return result[:15000]
+
+    except Exception as e:
+        import traceback
+        return f"ไม่สามารถอ่าน PDF Sales Report: {e}\n{traceback.format_exc()[:500]}"

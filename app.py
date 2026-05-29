@@ -1,5 +1,5 @@
 """
-OWNDAYS L&D Secretary Bot v28
+OWNDAYS L&D Secretary Bot v29
 LINE Bot + Claude API + Google Sheets + PostgreSQL Memory
 """
 
@@ -26,7 +26,7 @@ from hr_agent import run_hr_manager
 from web_agent import run_web_admin
 from data_agent import run_data_analyst
 from creator_agent import run_creator
-from retail_md_agent import run_retail_md, download_line_file, parse_excel_to_text
+from retail_md_agent import run_retail_md, download_line_file, parse_excel_to_text, parse_pdf_sales_report
 from models_config import print_model_summary
 
 app = Flask(__name__)
@@ -458,7 +458,7 @@ def reply_message(reply_token, text):
 # =============================================================
 @app.route("/", methods=["GET"])
 def health_check():
-    return "LD Secretary Bot v28 - Rocket is running!", 200
+    return "LD Secretary Bot v29 - Rocket is running!", 200
 
 
 @app.route("/webhook", methods=["POST"])
@@ -505,9 +505,11 @@ def webhook():
 
             try:
                 file_bytes = download_line_file(msg_id)
-                # แปลง Excel → CSV text
-                if file_name.lower().endswith((".xlsx", ".xls")):
+                fn_lower = file_name.lower()
+                if fn_lower.endswith((".xlsx", ".xls")):
                     sales_text = parse_excel_to_text(file_bytes)
+                elif fn_lower.endswith(".pdf"):
+                    sales_text = parse_pdf_sales_report(file_bytes)
                 else:
                     sales_text = file_bytes.decode("utf-8", errors="replace")
 
