@@ -6,49 +6,19 @@ od-connect.com (WIX platform) integration
 import os
 import requests
 
-WIX_CLIENT_ID     = os.getenv("WIX_CLIENT_ID", "")
-WIX_CLIENT_SECRET = os.getenv("WIX_CLIENT_SECRET", "")
-WIX_SITE_ID       = os.getenv("WIX_SITE_ID", "")
+# WIX API Key (IST.eyJ... format) — ใส่ใน Railway env: WIX_API_KEY
+# WIX Site ID — ดูจาก manage.wix.com/dashboard/{SITE_ID}/... ใส่ใน Railway env: WIX_SITE_ID
+WIX_API_KEY = os.getenv("WIX_API_KEY", "")
+WIX_SITE_ID = os.getenv("WIX_SITE_ID", "")
 BASE_URL = "https://www.wixapis.com"
 OD_CONNECT_URL = "https://www.od-connect.com"
 
-# ── OAuth token cache ──────────────────────────────────────────
-_token_cache = {"access_token": "", "expires_at": 0}
-
-
-def get_access_token() -> str:
-    """Exchange Client Credentials → Access Token (cached)"""
-    import time
-    if _token_cache["access_token"] and time.time() < _token_cache["expires_at"] - 60:
-        return _token_cache["access_token"]
-    if not WIX_CLIENT_ID or not WIX_CLIENT_SECRET:
-        return ""
-    try:
-        resp = requests.post(
-            "https://www.wixapis.com/oauth2/token",
-            json={
-                "clientId":     WIX_CLIENT_ID,
-                "clientSecret": WIX_CLIENT_SECRET,
-                "grantType":    "client_credentials",
-            },
-            timeout=10
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            _token_cache["access_token"] = data.get("access_token", "")
-            _token_cache["expires_at"]   = time.time() + data.get("expires_in", 3600)
-            return _token_cache["access_token"]
-    except Exception as e:
-        print(f"[WIX] token error: {e}")
-    return ""
-
 
 def wix_headers() -> dict:
-    """HTTP headers สำหรับ WIX API calls"""
-    token = get_access_token()
+    """HTTP headers สำหรับ WIX API calls (API Key auth)"""
     h = {"Content-Type": "application/json"}
-    if token:
-        h["Authorization"] = f"Bearer {token}"
+    if WIX_API_KEY:
+        h["Authorization"] = WIX_API_KEY   # WIX API Key ใส่ตรงๆ ไม่ต้อง Bearer
     if WIX_SITE_ID:
         h["wix-site-id"] = WIX_SITE_ID
     return h
