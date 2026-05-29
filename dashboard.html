@@ -647,42 +647,43 @@ let rawSprImg = null;  // raw sprite Image
 const agentSprites = {};  // agent_id → processed canvas (white removed)
 let spritesReady = false;
 
-// ── Build per-agent sprite canvases (80×80 each) ────────────────
-function buildAgentSprites(sprImg) {
-  AGENTS.forEach(a => {
-    const idx = SPRITE_IDX[a.id];
-    if (idx === undefined) return;
-    const sx = (idx % SPR_COLS) * SPR_W;
-    const sy = Math.floor(idx / SPR_COLS) * SPR_H;
-    const W = 100, H = 100;
-    const sc = document.createElement('canvas');
-    sc.width = W; sc.height = H;
-    const sctx = sc.getContext('2d');
-    sctx.drawImage(sprImg, sx, sy, SPR_W, SPR_H, 0, 0, W, H);
-    try {
-      const id = sctx.getImageData(0, 0, W, H);
-      const d = id.data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i]>215 && d[i+1]>215 && d[i+2]>215) d[i+3] = 0;
-      }
-      sctx.putImageData(id, 0, 0);
-    } catch(e) { /* CORS fallback: keep original pixels */ }
-    agentSprites[a.id] = sc;
-  });
-  spritesReady = true;
-  console.log('[Sprites] ready', Object.keys(agentSprites).length, 'agents');
-}
-
-// ── Load both assets ────────────────────────────────────────────
+// ── Load assets with crossOrigin for canvas getImageData ────────
 (function loadAssets() {
   const bg = new Image();
+  bg.crossOrigin = 'anonymous';
   bg.onload  = () => { bgImg = bg; bgReady = true; console.log('[BG] ready'); };
-  bg.onerror = () => console.error('[BG] load failed');
+  bg.onerror = () => console.warn('[BG] load failed — using fallback');
   bg.src = '/static/office_bg.png';
 
   const spr = new Image();
-  spr.onload  = () => { rawSprImg = spr; buildAgentSprites(spr); };
-  spr.onerror = () => console.error('[Sprites] load failed');
+  spr.crossOrigin = 'anonymous';
+  spr.onload  = () => {
+    rawSprImg = spr;
+    // Store raw image — we'll draw from it directly (no getImageData needed)
+    // Also try to build cleaned sprites
+    AGENTS.forEach(a => {
+      const idx = SPRITE_IDX[a.id];
+      if (idx === undefined) return;
+      const sx = (idx % SPR_COLS) * SPR_W;
+      const sy = Math.floor(idx / SPR_COLS) * SPR_H;
+      const sc = document.createElement('canvas');
+      sc.width = SPR_W; sc.height = SPR_H;
+      const sctx = sc.getContext('2d');
+      sctx.drawImage(spr, sx, sy, SPR_W, SPR_H, 0, 0, SPR_W, SPR_H);
+      try {
+        const id = sctx.getImageData(0, 0, SPR_W, SPR_H);
+        const d = id.data;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i]>215 && d[i+1]>215 && d[i+2]>215) d[i+3] = 0;
+        }
+        sctx.putImageData(id, 0, 0);
+      } catch(e) { console.warn('[Sprites] getImageData blocked, using raw'); }
+      agentSprites[a.id] = sc;
+    });
+    spritesReady = true;
+    console.log('[Sprites] ready:', Object.keys(agentSprites).length, 'agents');
+  };
+  spr.onerror = () => console.warn('[Sprites] load failed — using emoji fallback');
   spr.src = '/static/agents_sprites.png';
 })();
 
@@ -840,13 +841,14 @@ function drawChar(w) {
 
   const spr = agentSprites[agent.id];
   if (spritesReady && spr) {
-    const dH = ps(52);
-    const dW = dH;  // square crop (100×100)
+    // Display size — maintain aspect ratio (SPR_W × SPR_H)
+    const dH = ps(55);
+    const dW = dH * (SPR_W / SPR_H);
 
     const bob = moving ? (frame%2===0 ? -ps(2) : ps(0.5)) : 0;
     const glow = busy ? Math.sin(Date.now()/220)*ps(2) : 0;
     const drawX = px(x) - dW/2;
-    const drawY = py(y) - dH + bob + glow;
+    const drawY = py(y) - dH*0.85 + bob + glow;
 
     // Busy aura
     if (busy) {
@@ -865,7 +867,7 @@ function drawChar(w) {
       ctx.translate(px(x)*2, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(spr, 0, 0, 100, 100, drawX, drawY, dW, dH);
+    ctx.drawImage(spr, 0, 0, SPR_W, SPR_H, drawX, drawY, dW, dH);
 
   } else {
     // Fallback emoji while sprites load

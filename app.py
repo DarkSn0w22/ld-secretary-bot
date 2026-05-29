@@ -31,7 +31,15 @@ from models_config import print_model_summary
 from agent_log import log_agent, get_logs, clear_logs
 from agent_bus import bus
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
+
+@app.after_request
+def add_cors_for_static(response):
+    """เพิ่ม CORS header สำหรับ static files (ให้ canvas getImageData ทำงานได้)"""
+    if '/static/' in request.path:
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+    return response
 
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
