@@ -960,23 +960,51 @@ canvas.addEventListener('click', e => {
 // ═══════════════════════════════════════════════════════════════
 //  AGENT SIDEBAR
 // ═══════════════════════════════════════════════════════════════
+// ─── Real-time agent status from /api/agent-status ──────────────
+let busStatus = {};  // {agent_id: {status, current_task, tasks_done, last_active}}
+async function fetchAgentStatus() {
+  try {
+    const r = await fetch('/api/agent-status', {headers: AUTH_HEADERS});
+    if(!r.ok) return;
+    const d = await r.json();
+    busStatus = d.agents || {};
+    // Update header online count
+    const total = 12; // Rocket (always) + 11 registered
+    document.getElementById('hon').textContent = total;
+    document.getElementById('hon').style.color = 'var(--green)';
+  } catch(e) {}
+}
+fetchAgentStatus();
+setInterval(fetchAgentStatus, 3000);
+
 function renderList() {
   const el = document.getElementById('alist');
   if(!el) return;
   el.innerHTML = AGENTS.map(a => {
     const w = walkers.find(x=>x.agent.id===a.id);
-    const st = w.busy ? 'bz' : w.state==='sit' ? 'on' : 'wk';
-    const stateLabel = w.busy ? 'busy' : w.state==='sit' ? 'at desk' : 'wandering';
+    const bs = busStatus[a.id];  // real bus status
+    // Merge: bus says busy → show busy; else use walker animation state
+    const realBusy = bs && bs.status === 'busy';
+    if(realBusy && w) { w.busy = true; }
+    else if(!realBusy && w) { w.busy = false; }
+    const st = realBusy ? 'bz' : (w && w.state==='sit') ? 'on' : 'wk';
+    const queueBadge = (bs && bs.queue_size > 0) ? ` [+${bs.queue_size}]` : '';
+    const stateLabel = realBusy
+      ? (bs.current_task ? bs.current_task.slice(0,35) : 'working...')
+      : (w && w.bubble ? `"${w.bubble}"` : (a.id==='rocket' ? 'online' : 'idle'));
+    const tasksDone = bs ? `${bs.tasks_done} tasks` : '';
     return `<div class="acard ${selId===a.id?'sel':''}" style="--ac:${a.color}" onclick="selectAgent('${a.id}')">
       <div class="arow">
         <span class="aem">${a.em}</span>
         <div class="ainfo">
-          <div class="aname">${a.name}</div>
+          <div class="aname" style="display:flex;align-items:center;gap:5px;">${a.name}
+            ${tasksDone ? `<span style="font-size:7px;color:var(--text3);font-family:'Share Tech Mono';">${tasksDone}</span>` : ''}
+          </div>
           <div class="arole">${a.role}</div>
         </div>
         <div class="adot ${st}"></div>
       </div>
-      <div class="astate">${a.em} ${stateLabel}${w.bubble?' — "'+w.bubble+'"':''}</div>
+      <div class="astate${realBusy?' busy-text':''}" style="${realBusy?'color:var(--orange);':''}">${stateLabel}${queueBadge}</div>
     </div>`;
   }).join('');
 }

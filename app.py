@@ -29,6 +29,7 @@ from creator_agent import run_creator
 from retail_md_agent import run_retail_md, download_line_file, parse_excel_to_text, parse_pdf_sales_report
 from models_config import print_model_summary
 from agent_log import log_agent, get_logs, clear_logs
+from agent_bus import bus
 
 app = Flask(__name__)
 
@@ -221,6 +222,8 @@ TOOLS = [
 
 
 def execute_tool(tool_name, tool_input):
+    """Route tool call → agent bus (หรือ direct call สำหรับ data tools)"""
+    # ── Data tools: เรียกตรงเพราะไม่ใช่ AI agent ──
     if tool_name == "get_survey_data":
         return get_survey_summary()
     elif tool_name == "get_oar_data":
@@ -229,41 +232,69 @@ def execute_tool(tool_name, tool_input):
         sheet_key = tool_input.get("sheet_key", "survey")
         names = get_sheet_names(SHEET_IDS.get(sheet_key, SHEET_IDS["survey"]))
         return f"Sheets ใน {sheet_key}: {', '.join(names)}" if names else "ไม่พบข้อมูล"
-    elif tool_name == "ask_manager":
-        task = tool_input.get("task", "")
-        return run_manager(task)
     elif tool_name == "web_search":
-        query = tool_input.get("query", "")
-        return google_search(query)
-    elif tool_name == "ask_trainer_manager":
-        task = tool_input.get("task", "")
-        return run_trainer_manager(task)
-    elif tool_name == "ask_reporter":
-        report_type = tool_input.get("report_type", "weekly")
-        return run_reporter(report_type)
-    elif tool_name == "ask_reviewer":
-        review_content = tool_input.get("content", "")
-        content_type = tool_input.get("content_type", "report")
-        return run_reviewer(review_content, content_type)
-    elif tool_name == "ask_financial":
-        task = tool_input.get("task", "")
-        return run_financial_manager(task)
-    elif tool_name == "ask_legal":
-        task = tool_input.get("task", "")
-        return run_legal_manager(task)
-    elif tool_name == "ask_hr":
-        task = tool_input.get("task", "")
-        return run_hr_manager(task)
-    elif tool_name == "ask_web_admin":
-        task = tool_input.get("task", "")
-        return run_web_admin(task)
-    elif tool_name == "ask_data_analyst":
-        task = tool_input.get("task", "")
-        return run_data_analyst(task)
-    elif tool_name == "ask_creator":
-        task = tool_input.get("task", "")
-        return run_creator(task)
+        return google_search(tool_input.get("query", ""))
+
+    # ── AI Agent tools: ส่งผ่าน bus (มี queue + worker thread) ──
+    AGENT_TOOL_MAP = {
+        "ask_manager":       ("atlas",  lambda i: i.get("task", "")),
+        "ask_trainer_manager": ("pulse", lambda i: i.get("task", "")),
+        "ask_reporter":      ("sage",   lambda i: i.get("report_type", "weekly")),
+        "ask_reviewer":      ("guard",  lambda i: i.get("content", "")),
+        "ask_financial":     ("coin",   lambda i: i.get("task", "")),
+        "ask_legal":         ("lex",    lambda i: i.get("task", "")),
+        "ask_hr":            ("people", lambda i: i.get("task", "")),
+        "ask_web_admin":     ("pixel",  lambda i: i.get("task", "")),
+        "ask_data_analyst":  ("sigma",  lambda i: i.get("task", "")),
+        "ask_creator":       ("lens",   lambda i: i.get("task", "")),
+        "ask_retail_md":     ("rex",    lambda i: i.get("task", "")),
+    }
+    if tool_name in AGENT_TOOL_MAP:
+        agent_id, get_task = AGENT_TOOL_MAP[tool_name]
+        task = get_task(tool_input)
+        if bus.is_registered(agent_id):
+            # ส่งผ่าน bus แบบ sync-wait (Claude tool loop ต้องการผล)
+            result_holder = [None]
+            ev = __import__("threading").Event()
+            def _cb(aid, result, error):
+                result_holder[0] = result if result else f"⚠️ {error}"
+                ev.set()
+            bus.send("rocket", agent_id, task, _cb)
+            ev.wait(timeout=90)
+            return result_holder[0] or "ไม่ได้รับผลลัพธ์ภายใน 90 วินาที"
+        # fallback ถ้า bus ยังไม่พร้อม
+        direct = {
+            "atlas": run_manager, "pulse": run_trainer_manager,
+            "sage": run_reporter, "guard": run_reviewer,
+            "coin": run_financial_manager, "lex": run_legal_manager,
+            "people": run_hr_manager, "pixel": run_web_admin,
+            "sigma": run_data_analyst, "lens": run_creator,
+            "rex": run_retail_md,
+        }
+        return direct[agent_id](task) if agent_id in direct else "Agent ไม่พร้อม"
+
     return "ไม่พบ tool นี้"
+
+
+def execute_tools_parallel(tool_blocks: list) -> list:
+    """Execute หลาย tool call พร้อมกัน (parallel) แล้วคืน results ตามลำดับ"""
+    import threading
+    results = [None] * len(tool_blocks)
+
+    def _run(idx, block):
+        results[idx] = execute_tool(block.name, block.input)
+
+    threads = []
+    for i, block in enumerate(tool_blocks):
+        if block.type == "tool_use":
+            t = threading.Thread(target=_run, args=(i, block), daemon=True)
+            threads.append((i, t))
+            t.start()
+
+    for _, t in threads:
+        t.join(timeout=120)
+
+    return results
 
 
 # =============================================================
@@ -426,21 +457,19 @@ def get_claude_response(user_id: str, message: str) -> str:
                 history.append({"role": "assistant", "content": response.content})
                 save_message(user_id, "assistant", response.content)
 
+                # ── Parallel execution: รัน tool calls พร้อมกันทั้งหมด ──
+                use_blocks = [b for b in response.content if b.type == "tool_use"]
+                parallel_results = execute_tools_parallel(use_blocks)
+
                 tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        print(f"Tool: {block.name}")
-                        # Log Rocket calling a sub-agent
-                        target = block.name.replace("ask_", "")
-                        task_preview = str(block.input)[:150]
-                        log_agent("rocket", target, task_preview)
-                        result = execute_tool(block.name, block.input)
-                        log_agent(target, "rocket", "", result[:250])
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result
-                        })
+                for i, block in enumerate(use_blocks):
+                    print(f"Tool: {block.name}")
+                    result = parallel_results[i] or "ไม่ได้รับผลลัพธ์"
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result
+                    })
 
                 history.append({"role": "user", "content": tool_results})
                 save_message(user_id, "user", tool_results)
@@ -769,7 +798,30 @@ def api_schedule_config_post():
         return jsonify({"error": str(e)}), 500
 
 
-# Start scheduler
+@app.route("/api/agent-status", methods=["GET"])
+def api_agent_status():
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify({"agents": bus.get_status(), "online": bus.online_count()})
+
+
+# ─── Start background services ────────────────────────────────────────────────
+def _start_agent_bus():
+    """Register agents into bus — แต่ละตัวมี worker thread ของตัวเอง"""
+    bus.register("atlas",  run_manager)
+    bus.register("pulse",  run_trainer_manager)
+    bus.register("sage",   run_reporter)
+    bus.register("guard",  run_reviewer)
+    bus.register("coin",   run_financial_manager)
+    bus.register("lex",    run_legal_manager)
+    bus.register("people", run_hr_manager)
+    bus.register("pixel",  run_web_admin)
+    bus.register("sigma",  run_data_analyst)
+    bus.register("lens",   run_creator)
+    bus.register("rex",    run_retail_md)
+    print(f"[Bus] {bus.online_count()} agents online ✓")
+
+_start_agent_bus()
 start_scheduler()
 
 if __name__ == "__main__":
