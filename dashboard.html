@@ -197,6 +197,78 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 .chat-entry{display:flex;gap:8px;font-size:10px;animation:fi .25s ease;padding:3px 0;border-bottom:1px solid rgba(28,40,64,.5);}
 .chat-entry:last-child{border-bottom:none;}
 
+/* ════════════════════════════════════════
+   GAME CARDS — Agents page
+════════════════════════════════════════ */
+.gcard-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(155px,1fr));
+  gap:14px;padding:18px;
+}
+.gcard{
+  position:relative;border-radius:12px;overflow:hidden;cursor:pointer;
+  transition:transform .2s,box-shadow .2s;
+  border:2px solid var(--tc,#4f9eff);
+  box-shadow:0 0 18px var(--tg,rgba(79,158,255,.3));
+  background:linear-gradient(170deg,#0d1525 0%,#070b12 55%,#0a0d16 100%);
+  display:flex;flex-direction:column;
+}
+.gcard:hover{transform:translateY(-6px) scale(1.03);box-shadow:0 10px 36px var(--tg,rgba(79,158,255,.5));}
+
+/* holographic shimmer on hover */
+.gcard::after{
+  content:'';position:absolute;inset:0;border-radius:12px;
+  background:linear-gradient(135deg,transparent 40%,rgba(255,255,255,.04) 50%,transparent 60%);
+  opacity:0;transition:.3s;pointer-events:none;
+}
+.gcard:hover::after{opacity:1;}
+
+/* tier badge */
+.gtier{
+  position:absolute;top:8px;left:8px;z-index:2;
+  font-family:'Press Start 2P';font-size:6px;letter-spacing:.5px;
+  padding:3px 6px;border-radius:3px;
+  color:#000;background:var(--tc,#4f9eff);
+  box-shadow:0 1px 6px var(--tg,rgba(79,158,255,.6));
+}
+/* online dot top-right */
+.gonline{
+  position:absolute;top:10px;right:10px;z-index:2;
+  width:7px;height:7px;border-radius:50%;
+  background:var(--green);box-shadow:0 0 6px var(--green);
+  animation:bk 2s infinite;
+}
+/* sprite area */
+.gsprite{
+  width:100%;height:160px;display:flex;align-items:center;justify-content:center;
+  position:relative;flex-shrink:0;
+  background:radial-gradient(circle at 50% 70%,var(--tg,rgba(79,158,255,.12)) 0%,transparent 70%);
+}
+.gsprite canvas{image-rendering:pixelated;image-rendering:crisp-edges;}
+
+/* bottom body */
+.gbody{
+  padding:10px 10px 12px;
+  background:linear-gradient(0deg,rgba(0,0,0,.6) 0%,transparent 100%);
+}
+.gname{
+  font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;
+  color:var(--tc,#4f9eff);text-shadow:0 0 10px var(--tg,rgba(79,158,255,.5));
+  letter-spacing:.5px;
+}
+.grole{font-size:8px;color:var(--text3);margin-top:1px;letter-spacing:.5px;text-transform:uppercase;}
+.gtools{margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;}
+.gtool-tag{
+  font-family:'Share Tech Mono';font-size:8px;color:var(--cyan);
+  background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.25);
+  border-radius:3px;padding:2px 5px;
+}
+.glast{
+  margin-top:6px;padding-top:5px;border-top:1px solid rgba(255,255,255,.06);
+  font-size:8px;color:var(--text3);line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
 /* SCHEDULE PAGE */
 .sch-row{
   display:flex;align-items:center;gap:10px;background:var(--panel);
@@ -349,10 +421,10 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
        PAGE: Agents
   ══════════════════════════════════════════════ -->
   <div id="pg-agents" class="page" style="display:none;flex-direction:column;">
-    <div style="flex:1;overflow-y:auto;padding:16px;background:var(--bg2);">
-      <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--blue);
-                  letter-spacing:1px;margin-bottom:14px;">🤖 ALL AGENTS — STATUS OVERVIEW</div>
-      <div id="agent-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+    <div style="flex:1;overflow-y:auto;background:var(--bg);">
+      <div style="padding:14px 18px 0;font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;
+                  color:var(--text2);letter-spacing:1.5px;">⚔️ AGENT ROSTER — THAILAND REGION</div>
+      <div id="agent-cards" class="gcard-grid"></div>
     </div>
   </div><!-- /pg-agents -->
 
@@ -1123,29 +1195,134 @@ setInterval(pollChat, 3000);
 // ═══════════════════════════════════════════════════════════════
 let agentCardsRendered = false;
 
+// ─── Tier config per agent ───────────────────────────────────
+const TIERS = {
+  rocket: {t:'LEGENDARY', c:'#ffd700', g:'rgba(255,215,0,.45)'},
+  atlas:  {t:'EPIC',      c:'#b44bff', g:'rgba(180,75,255,.4)'},
+  rex:    {t:'EPIC',      c:'#b44bff', g:'rgba(180,75,255,.4)'},
+  pulse:  {t:'EPIC',      c:'#b44bff', g:'rgba(180,75,255,.4)'},
+  sage:   {t:'RARE',      c:'#4f9eff', g:'rgba(79,158,255,.35)'},
+  guard:  {t:'RARE',      c:'#4f9eff', g:'rgba(79,158,255,.35)'},
+  coin:   {t:'RARE',      c:'#ffd166', g:'rgba(255,209,102,.3)'},
+  lex:    {t:'RARE',      c:'#fb923c', g:'rgba(251,146,60,.3)'},
+  people: {t:'RARE',      c:'#e879f9', g:'rgba(232,121,249,.3)'},
+  pixel:  {t:'COMMON',    c:'#38bdf8', g:'rgba(56,189,248,.25)'},
+  sigma:  {t:'COMMON',    c:'#4ade80', g:'rgba(74,222,128,.25)'},
+  lens:   {t:'COMMON',    c:'#f9a8d4', g:'rgba(249,168,212,.25)'},
+};
+
+// ─── Draw mini pixel-art sprite on a card canvas ─────────────
+function drawCardSprite(cvs, agent) {
+  const W = cvs.width, H = cvs.height;
+  const c = cvs.getContext('2d');
+  c.clearRect(0, 0, W, H);
+  c.imageSmoothingEnabled = false;
+  const sc = W / 60;    // scale factor (canvas is 60 units wide)
+  function p(v){ return v * sc; }
+  const x = W/2, y = H * 0.72;
+
+  // Glow aura
+  const aura = c.createRadialGradient(x, y-p(8), 0, x, y-p(8), p(22));
+  aura.addColorStop(0, (TIERS[agent.id]?.g || 'rgba(79,158,255,.15)'));
+  aura.addColorStop(1, 'transparent');
+  c.fillStyle = aura;
+  c.beginPath(); c.ellipse(x, y-p(8), p(22), p(22), 0, 0, Math.PI*2); c.fill();
+
+  // Shadow
+  c.fillStyle = 'rgba(0,0,0,.45)';
+  c.beginPath(); c.ellipse(x, y+p(12), p(9), p(2.5), 0, 0, Math.PI*2); c.fill();
+
+  // Legs
+  c.fillStyle = '#1a2535';
+  c.fillRect(x-p(5), y+p(1), p(4), p(9));
+  c.fillRect(x+p(1), y+p(1), p(4), p(9));
+  // Shoes
+  c.fillStyle = '#0a0f1a';
+  c.fillRect(x-p(6), y+p(9), p(5), p(3));
+  c.fillRect(x+p(1), y+p(9), p(5), p(3));
+
+  // Body gradient
+  const bg = c.createLinearGradient(0, y-p(11), 0, y+p(2));
+  bg.addColorStop(0, agent.bodyCol);
+  bg.addColorStop(1, shadeColor(agent.bodyCol, -35));
+  c.fillStyle = bg; c.fillRect(x-p(7), y-p(11), p(14), p(13));
+  // Shirt shine
+  c.fillStyle = 'rgba(255,255,255,.17)'; c.fillRect(x-p(2), y-p(11), p(4), p(3));
+  // Arms
+  c.fillStyle = agent.bodyCol;
+  c.fillRect(x-p(11), y-p(9), p(4), p(10)); c.fillRect(x+p(7), y-p(9), p(4), p(10));
+  // Hands
+  c.fillStyle = '#f5c9a0';
+  c.fillRect(x-p(11), y+p(1), p(4), p(4)); c.fillRect(x+p(7), y+p(1), p(4), p(4));
+
+  // Neck + Head
+  c.fillStyle = '#f5c9a0';
+  c.fillRect(x-p(2.5), y-p(14), p(5), p(3));
+  c.fillRect(x-p(7), y-p(26), p(14), p(13));
+
+  // Hair
+  c.fillStyle = agent.hairCol;
+  c.fillRect(x-p(7), y-p(26), p(14), p(5));
+  c.fillRect(x-p(8), y-p(26), p(2), p(9));
+
+  // Eyes
+  c.fillStyle = '#050510';
+  c.fillRect(x-p(4.5), y-p(19), p(2.5), p(3)); c.fillRect(x+p(2), y-p(19), p(2.5), p(3));
+  c.fillStyle = 'rgba(255,255,255,.65)';
+  c.fillRect(x-p(4), y-p(19), p(1), p(1.2)); c.fillRect(x+p(2.5), y-p(19), p(1), p(1.2));
+  // Mouth smile
+  c.fillStyle = '#c07070';
+  c.fillRect(x-p(2), y-p(14.5), p(4), p(1));
+
+  // Big emoji above head (bouncing)
+  const bounce = Math.sin(Date.now()/700) * p(1.5);
+  c.font = `${p(13)}px serif`;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(agent.em, x, y-p(36)+bounce);
+}
+
 function renderAgentCards() {
   if(agentCardsRendered) return;
   agentCardsRendered = true;
   const grid = document.getElementById('agent-cards');
   if(!grid) return;
+
   grid.innerHTML = AGENTS.map(a => {
-    const toolTags = a.tools.map(t =>
-      `<span style="display:inline-block;background:var(--bg);border:1px solid var(--border2);border-radius:3px;padding:2px 6px;font-size:9px;color:var(--cyan);margin:2px;font-family:'Share Tech Mono';">${t}</span>`
-    ).join('');
-    return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <span style="font-size:24px;">${a.em}</span>
-        <div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:${a.color};">${a.name}</div>
-          <div style="font-size:9px;color:var(--text2);">${a.role}</div>
-        </div>
-        <div style="margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);"></div>
+    const tier = TIERS[a.id] || {t:'COMMON', c:'#64748b', g:'rgba(100,116,139,.2)'};
+    const toolTags = a.tools.map(t => `<span class="gtool-tag">${t}</span>`).join('');
+    return `<div class="gcard" style="--tc:${tier.c};--tg:${tier.g};"
+              onclick="document.querySelector('.ntab.on').classList.remove('on');
+                       document.querySelectorAll('.ntab')[0].classList.add('on');
+                       document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+                       document.getElementById('pg-office').style.display='flex';
+                       selectAgent('${a.id}')">
+      <div class="gtier">${tier.t}</div>
+      <div class="gonline"></div>
+      <div class="gsprite">
+        <canvas id="card-cvs-${a.id}" width="120" height="148" style="width:120px;height:148px;"></canvas>
       </div>
-      <div style="font-size:9px;color:var(--text3);margin-bottom:6px;letter-spacing:1px;">TOOLS</div>
-      <div>${toolTags}</div>
-      <div id="agent-last-${a.id}" style="margin-top:8px;font-size:9px;color:var(--text3);border-top:1px solid var(--border);padding-top:6px;">Last: —</div>
+      <div class="gbody">
+        <div class="gname">${a.name}</div>
+        <div class="grole">${a.role}</div>
+        <div class="gtools">${toolTags}</div>
+        <div class="glast" id="agent-last-${a.id}">—</div>
+      </div>
     </div>`;
   }).join('');
+
+  // Draw sprites (+ re-animate every second)
+  function animateCards() {
+    AGENTS.forEach(a => {
+      const cvs = document.getElementById('card-cvs-'+a.id);
+      if(cvs) drawCardSprite(cvs, a);
+    });
+  }
+  animateCards();
+  if(!window._cardAnimInterval) {
+    window._cardAnimInterval = setInterval(() => {
+      if(document.getElementById('pg-agents').style.display !== 'none') animateCards();
+    }, 800);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
