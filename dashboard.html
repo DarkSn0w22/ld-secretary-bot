@@ -599,21 +599,48 @@ const ctx = canvas.getContext('2d');
 
 const DW = 560, DH = 280;
 
-// Desk positions matched to office_bg.png layout (1264×843 → 560×280)
-// Background has desks in 2 main rows + 2 lower desks
+// ── Walkable floor polygon (image 1264×843 → virtual 560×280) ───
+// Orange boundary from user — walls/shelves/out-of-bounds excluded
+// Scale: kx=0.443, ky=0.332
+const WALK_POLY = [
+  {x:73,  y:275},  // bottom-left
+  {x:60,  y:210},  // left side going up
+  {x:80,  y:152},  // upper-left corner
+  {x:128, y:110},  // bend past bookshelf
+  {x:195, y:97},   // top-left walkable
+  {x:285, y:92},   // top middle-left
+  {x:390, y:88},   // top middle
+  {x:490, y:85},   // top right
+  {x:520, y:100},  // upper-right corner
+  {x:525, y:190},  // right side
+  {x:520, y:275},  // bottom-right
+];
+
+function pointInPoly(x, y, poly) {
+  let inside = false;
+  for (let i=0, j=poly.length-1; i<poly.length; j=i++) {
+    const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    if (((yi>y) !== (yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside = !inside;
+  }
+  return inside;
+}
+function isWalkable(x, y) { return pointInPoly(x, y, WALK_POLY); }
+
+// Desk positions — matched to actual desks visible in office_bg.png
+// image pixel coords (1264×843) scaled to virtual (560×280)
 const DESK_POSITIONS = [
-  {x:62,  y:82},   // Rocket — ซ้ายบน ริมหน้าต่าง
-  {x:155, y:75},   // Atlas — โต๊ะ 2 แถวบน
-  {x:245, y:68},   // Pulse — โต๊ะ 3 แถวบน (ใกล้ป้าย LEARN)
-  {x:345, y:62},   // Sage — โต๊ะ 4 แถวบน (ใกล้ชั้นหนังสือ)
-  {x:445, y:55},   // Guard — โต๊ะ 5 ขวาบน (ใกล้ถ้วยรางวัล)
-  {x:72,  y:178},  // Coin — ซ้ายล่าง แถว 2
-  {x:165, y:172},  // Lex — โต๊ะ 2 แถวล่าง
-  {x:265, y:168},  // People — โต๊ะกลาง แถวล่าง
-  {x:365, y:162},  // Pixel — โต๊ะ 4 แถวล่าง (ใกล้จอใหญ่)
-  {x:465, y:155},  // Sigma — ขวาล่าง (ข้างจอ dashboard)
-  {x:165, y:240},  // Lens — ล่างซ้าย (โต๊ะเดี่ยว)
-  {x:365, y:235},  // Rex — ล่างขวา (โต๊ะเดี่ยว)
+  {x:170, y:132},  // Rocket  — left desk (holographic screen)
+  {x:255, y:118},  // Atlas   — center-back desk 1
+  {x:325, y:113},  // Pulse   — center-back desk 2
+  {x:440, y:105},  // Sage    — right-back desk
+  {x:500, y:100},  // Guard   — far-right upper station
+  {x:160, y:168},  // Coin    — left middle standing area
+  {x:260, y:163},  // Lex     — center desk row 2
+  {x:340, y:160},  // People  — center-right desk row 2
+  {x:410, y:155},  // Pixel   — right desk row 2
+  {x:480, y:145},  // Sigma   — far-right dashboard station
+  {x:285, y:195},  // Lens    — front multi-monitor station left
+  {x:390, y:190},  // Rex     — front hologram station
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -836,7 +863,7 @@ function drawChar(w) {
   const spr = agentSprites[agent.id];
   if (spr) {
     // Square sprite 200×200 → display size
-    const dH = ps(38);
+    const dH = ps(56);   // ใหญ่ขึ้นให้เท่าเก้าอี้ในรูป
     const dW = dH;
 
     const bob = moving ? (frame%2===0 ? -ps(1.5) : ps(0.5)) : 0;
@@ -942,11 +969,13 @@ const WANDER_PHRASES = [
 ];
 
 function randomWanderTarget() {
-  // Stay within office floor area (avoid walls/edges in background)
-  return {
-    tx: 50 + Math.random() * 430,   // x: 50-480
-    ty: 50 + Math.random() * 200,   // y: 50-250
-  };
+  // Random point inside the walkable polygon (rejection sampling)
+  for (let i = 0; i < 50; i++) {
+    const tx = 75 + Math.random() * 440;
+    const ty = 90 + Math.random() * 180;
+    if (isWalkable(tx, ty)) return {tx, ty};
+  }
+  return {tx: 250, ty: 160};  // safe fallback center
 }
 
 let lastTime = 0;
@@ -966,7 +995,13 @@ function update(ts) {
     if(w.state==='walk') {
       const dx=w.tx-w.x, dy=w.ty-w.y, dist=Math.sqrt(dx*dx+dy*dy), speed=0.065*dt;
       if(dist<speed+1) { w.x=w.tx; w.y=w.ty; w.walkTick-=dt; if(w.walkTick<=0){ if(Math.random()<0.55){w.tx=w.deskX;w.ty=w.deskY;w.state='return';}else{const t=randomWanderTarget();w.tx=t.tx;w.ty=t.ty;w.walkTick=150+Math.random()*300;} } }
-      else { w.x+=(dx/dist)*speed; w.y+=(dy/dist)*speed; if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up'; }
+      else {
+        const nx=w.x+(dx/dist)*speed, ny=w.y+(dy/dist)*speed;
+        // ห้ามเดินออกนอกพื้นที่ (ถ้าจะออก → หาเป้าหมายใหม่)
+        if(isWalkable(nx, ny)) { w.x=nx; w.y=ny; }
+        else { const t=randomWanderTarget(); w.tx=t.tx; w.ty=t.ty; }
+        if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up';
+      }
     }
     if(w.state==='return') {
       const dx=w.deskX-w.x, dy=w.deskY-w.y, dist=Math.sqrt(dx*dx+dy*dy), speed=0.08*dt;
