@@ -6,15 +6,51 @@ import os
 import json
 import base64
 
-GA4_PROPERTY_ID = os.getenv("GA4_PROPERTY_ID", "14969917253")
+# od-connect.com GA4 properties (ค้นพบจาก accountSummaries)
+GA4_PROPERTY_ID = os.getenv("GA4_PROPERTY_ID", "376227651")   # od-connect.com หลัก
+GA4_PROPERTY_IDS = ["376227651", "539554359"]                  # ทั้ง 2 properties
+
+# OAuth2 credentials ของ nakit@owndays.com (มีสิทธิ์ GA4 อยู่แล้ว)
+GA4_CLIENT_ID     = os.getenv("GA4_OAUTH_CLIENT_ID", "")
+GA4_CLIENT_SECRET = os.getenv("GA4_OAUTH_CLIENT_SECRET", "")
+GA4_REFRESH_TOKEN = os.getenv("GA4_REFRESH_TOKEN", "")
 
 
 def _get_ga4_client():
-    """สร้าง GA4 client จาก service account credentials เดิม"""
+    """สร้าง GA4 client — ลำดับ: OAuth refresh token → service account"""
     try:
         from google.analytics.data_v1beta import BetaAnalyticsDataClient
-        from google.oauth2 import service_account
 
+        # วิธีที่ 1: ใช้ OAuth Refresh Token ของ nakit@owndays.com
+        if GA4_REFRESH_TOKEN:
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+
+            # ถ้ามี client_id/secret ใช้ refresh ผ่าน OAuth2
+            if GA4_CLIENT_ID and GA4_CLIENT_SECRET:
+                creds = Credentials(
+                    token=None,
+                    refresh_token=GA4_REFRESH_TOKEN,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=GA4_CLIENT_ID,
+                    client_secret=GA4_CLIENT_SECRET,
+                    scopes=["https://www.googleapis.com/auth/analytics.readonly"]
+                )
+            else:
+                # ใช้ Google's default OAuth app (OAuth Playground)
+                creds = Credentials(
+                    token=None,
+                    refresh_token=GA4_REFRESH_TOKEN,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id="764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com",
+                    client_secret="d-FL95Q19q7MQmFpd7hHD0Ty",
+                    scopes=["https://www.googleapis.com/auth/analytics.readonly"]
+                )
+            creds.refresh(Request())
+            return BetaAnalyticsDataClient(credentials=creds)
+
+        # วิธีที่ 2: ใช้ Service Account (fallback)
+        from google.oauth2 import service_account
         creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
         if creds_json:
             creds_dict = json.loads(base64.b64decode(creds_json).decode("utf-8"))
@@ -215,6 +251,9 @@ def get_full_analytics(days: int = 7) -> dict:
 def ga4_ready() -> bool:
     """True ถ้า GA4 credentials พร้อม"""
     return bool(
-        GA4_PROPERTY_ID and
-        (os.getenv("GOOGLE_CREDENTIALS_JSON") or os.path.exists("credentials.json"))
+        GA4_PROPERTY_ID and (
+            GA4_REFRESH_TOKEN or
+            os.getenv("GOOGLE_CREDENTIALS_JSON") or
+            os.path.exists("credentials.json")
+        )
     )
