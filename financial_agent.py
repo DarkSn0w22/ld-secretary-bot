@@ -159,13 +159,24 @@ def push_budget_alert(alerts: list):
         print(f"Coin alert error: {e}")
 
 
+# Track วันที่ส่ง budget alert ล่าสุด — ส่งได้วันละครั้งเท่านั้น
+_alert_sent_date = None
+
 def execute_coin_tool(tool_name, tool_input):
+    global _alert_sent_date
     if tool_name == "get_cost_data":
         raw = fetch_dashboard("cost")
-        # เช็ค alert พร้อมกัน
-        alerts = check_budget_alerts(raw)
-        if alerts:
-            push_budget_alert(alerts)
+        # เช็ค alert แต่ส่งได้วันละครั้งเท่านั้น
+        from datetime import date
+        today = date.today()
+        if _alert_sent_date != today:
+            alerts = check_budget_alerts(raw)
+            if alerts:
+                push_budget_alert(alerts)
+                _alert_sent_date = today
+                print(f"Coin: alert sent (will not repeat today)")
+            else:
+                print("Coin: no alert needed")
         return get_cost_dashboard()
     elif tool_name == "get_financial_page":
         return get_financial_page()

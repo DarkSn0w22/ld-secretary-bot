@@ -130,15 +130,96 @@ def consolidated_morning_report() -> str:
                 f"📚 Sage: {reports.get('sage','?')}")
 
 
+# ── Activity digest config ────────────────────────────────────────
+# ส่งสรุปกิจกรรม agent ทุก X ชั่วโมง ถ้ามีการทำงานจริง
+ACTIVITY_DIGEST_HOURS = [11, 15, 19]   # 11:00, 15:00, 19:00
+_last_activity_epoch = 0.0             # epoch ของ log ล่าสุดที่ส่งไปแล้ว
+
+
+def build_activity_digest() -> str | None:
+    """สร้างสรุปกิจกรรม agents ตั้งแต่ครั้งสุดท้าย — คืน None ถ้าไม่มีอะไรใหม่"""
+    global _last_activity_epoch
+    from agent_log import get_logs
+    import time
+
+    # ดึง log ใหม่ตั้งแต่ครั้งล่าสุด
+    new_logs = get_logs(n=100, since_epoch=_last_activity_epoch)
+
+    # กรองเฉพาะ agent calls จริง (ไม่ใช่ user/dashboard/scheduler)
+    skip = {"user", "dashboard", "scheduler", "rocket"}
+    activity = [
+        l for l in new_logs
+        if l.get("from", "").lower() not in skip
+        or l.get("to", "").lower() not in skip
+    ]
+    # เฉพาะที่เป็น agent → agent หรือ rocket → agent
+    real_calls = [
+        l for l in new_logs
+        if (l.get("from", "") == "rocket" and l.get("to", "") not in {"user", "dashboard"})
+        or (l.get("from", "") not in {"user", "dashboard", "scheduler"}
+            and l.get("to", "") not in {"user", "dashboard"})
+    ]
+
+    if not real_calls:
+        return None  # ไม่มีกิจกรรมใหม่
+
+    # อัพเดต epoch
+    _last_activity_epoch = max(l["epoch"] for l in real_calls)
+
+    # สรุปด้วย Claude (Rocket voice)
+    now = datetime.now(BANGKOK_TZ)
+    time_str = now.strftime("%H:%M น.")
+    log_text = "\n".join(
+        f"- {l['from'].upper()} → {l['to'].upper()}: {l['msg'][:80]}"
+        + (f"\n  ✅ {l['res'][:120]}" if l.get('res') else "")
+        for l in real_calls[-12:]  # 12 รายการล่าสุด
+    )
+
+    prompt = f"""เวลา {time_str}
+
+กิจกรรม agent ล่าสุด:
+{log_text}
+
+คุณคือ Rocket เลขานุการ AI
+สรุปสิ่งที่ทีมทำในช่วงที่ผ่านมาให้ Peanut ทราบ:
+- ขึ้นต้น: 🤖 + เวลา + "ทีมรายงาน"
+- บอกว่า agent ไหนทำอะไร ผลลัพธ์สำคัญคืออะไร
+- ถ้ามีสิ่งที่ต้อง action → แจ้งด้วย
+- plain text ไม่มี Markdown
+- กระชับ ไม่เกิน 500 ตัวอักษร
+- ลงท้าย "ครับ" """
+
+    try:
+        resp = claude.messages.create(
+            model=get_model("scheduler"),
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return resp.content[0].text.strip()
+    except Exception as e:
+        # Fallback สั้นๆ
+        agents_done = list({l["from"].upper() for l in real_calls
+                            if l["from"] not in {"user", "dashboard", "scheduler"}})
+        return (f"🤖 {time_str} ทีมรายงาน\n\n"
+                f"Agent ที่ทำงาน: {', '.join(agents_done)}\n"
+                f"รวม {len(real_calls)} tasks ในช่วงที่ผ่านมาครับ")
+
+
 def scheduler_loop():
-    print("Scheduler started — 1 consolidated message at 09:00 Mon-Fri (Bangkok)")
+    print("Scheduler started — morning report 09:00 + activity digests 11:00/15:00/19:00")
     sent_today = None
+    sent_digest_hours = set()   # เซ็ต hours ที่ส่ง digest ไปแล้วในวันนี้
 
     while True:
         now = datetime.now(BANGKOK_TZ)
         today = now.date()
         weekday = now.weekday()
 
+        # รีเซ็ต digest tracker เมื่อขึ้นวันใหม่
+        if sent_today != today:
+            sent_digest_hours = set()
+
+        # ── Morning Report 09:00 จ-ศ ────────────────────────────
         if (now.hour == MORNING_HOUR and
                 now.minute == MORNING_MINUTE and
                 weekday in WORK_DAYS and
@@ -148,11 +229,27 @@ def scheduler_loop():
                 report = consolidated_morning_report()
                 if push_message(report):
                     sent_today = today
-                    print("[Scheduler] Morning report sent ✓ (1 message)")
-                else:
-                    print("[Scheduler] Failed to send morning report")
+                    print("[Scheduler] Morning report sent ✓")
             except Exception as e:
-                print(f"[Scheduler] Error: {e}")
+                print(f"[Scheduler] Morning report error: {e}")
+
+        # ── Activity Digest 11:00 / 15:00 / 19:00 ───────────────
+        if (now.hour in ACTIVITY_DIGEST_HOURS and
+                now.minute == 0 and
+                weekday in WORK_DAYS and
+                now.hour not in sent_digest_hours):
+            print(f"[Scheduler] Checking activity digest at {now.hour}:00...")
+            try:
+                digest = build_activity_digest()
+                if digest:
+                    if push_message(digest):
+                        sent_digest_hours.add(now.hour)
+                        print(f"[Scheduler] Activity digest sent ✓ ({now.hour}:00)")
+                else:
+                    sent_digest_hours.add(now.hour)
+                    print(f"[Scheduler] No new activity at {now.hour}:00 — skip")
+            except Exception as e:
+                print(f"[Scheduler] Activity digest error: {e}")
 
         time.sleep(30)
 
