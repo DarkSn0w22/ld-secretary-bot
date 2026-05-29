@@ -599,19 +599,21 @@ const ctx = canvas.getContext('2d');
 
 const DW = 560, DH = 280;
 
+// Desk positions matched to office_bg.png layout (1264×843 → 560×280)
+// Background has desks in 2 main rows + 2 lower desks
 const DESK_POSITIONS = [
-  {x:80,  y:60},  // Rocket
-  {x:180, y:60},  // Atlas
-  {x:280, y:60},  // Pulse
-  {x:380, y:60},  // Sage
-  {x:480, y:60},  // Guard
-  {x:80,  y:160}, // Coin
-  {x:180, y:160}, // Lex
-  {x:280, y:160}, // People
-  {x:380, y:160}, // Pixel
-  {x:480, y:160}, // Sigma
-  {x:190, y:230}, // Lens
-  {x:370, y:230}, // Rex
+  {x:62,  y:82},   // Rocket — ซ้ายบน ริมหน้าต่าง
+  {x:155, y:75},   // Atlas — โต๊ะ 2 แถวบน
+  {x:245, y:68},   // Pulse — โต๊ะ 3 แถวบน (ใกล้ป้าย LEARN)
+  {x:345, y:62},   // Sage — โต๊ะ 4 แถวบน (ใกล้ชั้นหนังสือ)
+  {x:445, y:55},   // Guard — โต๊ะ 5 ขวาบน (ใกล้ถ้วยรางวัล)
+  {x:72,  y:178},  // Coin — ซ้ายล่าง แถว 2
+  {x:165, y:172},  // Lex — โต๊ะ 2 แถวล่าง
+  {x:265, y:168},  // People — โต๊ะกลาง แถวล่าง
+  {x:365, y:162},  // Pixel — โต๊ะ 4 แถวล่าง (ใกล้จอใหญ่)
+  {x:465, y:155},  // Sigma — ขวาล่าง (ข้างจอ dashboard)
+  {x:165, y:240},  // Lens — ล่างซ้าย (โต๊ะเดี่ยว)
+  {x:365, y:235},  // Rex — ล่างขวา (โต๊ะเดี่ยว)
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -842,7 +844,7 @@ function drawChar(w) {
   const spr = agentSprites[agent.id];
   if (spritesReady && spr) {
     // Display size — maintain aspect ratio (SPR_W × SPR_H)
-    const dH = ps(55);
+    const dH = ps(38);     // ลดขนาดจาก 55 → 38 ให้เข้ากับโต๊ะ
     const dW = dH * (SPR_W / SPR_H);
 
     const bob = moving ? (frame%2===0 ? -ps(2) : ps(0.5)) : 0;
@@ -948,10 +950,10 @@ const WANDER_PHRASES = [
 ];
 
 function randomWanderTarget() {
-  const margin = 40;
+  // Stay within office floor area (avoid walls/edges in background)
   return {
-    tx: margin + Math.random()*(DW - margin*2),
-    ty: 40 + Math.random()*(DH - 80),
+    tx: 50 + Math.random() * 430,   // x: 50-480
+    ty: 50 + Math.random() * 200,   // y: 50-250
   };
 }
 
@@ -990,15 +992,20 @@ function render(ts) {
   update(ts);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawRoom();
-  AGENTS.forEach((agent, i) => {
-    const dp = DESK_POSITIONS[i];
-    const w = walkers[i];
-    drawDesk(dp.x, dp.y, agent, w.state === 'sit');
-  });
+  // No drawDesk — furniture is in the background image
+  // Draw characters sorted by y (back to front) for correct layering
   const sorted = [...walkers].sort((a,b) => a.y - b.y);
   sorted.forEach(w => {
     drawChar(w);
     if(w.bubble) drawBubble(w.x, w.y, w.bubble, w.agent.color);
+    // Name label below character
+    ctx.save();
+    ctx.font = `bold ${ps(4.5)}px 'Press Start 2P'`;
+    ctx.fillStyle = w.agent.color;
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = ps(4); ctx.shadowColor = 'rgba(0,0,0,.8)';
+    ctx.fillText(w.agent.name, px(w.x), py(w.y) + ps(14));
+    ctx.restore();
   });
   if(selId) {
     const w = walkers.find(x=>x.agent.id===selId);
