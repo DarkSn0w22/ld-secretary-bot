@@ -1,5 +1,5 @@
 """
-OWNDAYS L&D Secretary Bot v6
+OWNDAYS L&D Secretary Bot v28
 LINE Bot + Claude API + Google Sheets + PostgreSQL Memory
 """
 
@@ -316,6 +316,12 @@ Trainer Sales: Pui(Asst.Manager), Jets, Trin, Nueng, Tonpalm
 Trainer Optical: Jajah(Asst.Manager), Kio, Toy, Kwang, Mark
 Trainer Optometry: Dr.Benz, Dr.Milk, Dr.Lookaew
 
+== Trainer-Division Mapping (สำหรับ Dashboard Analytics) ==
+Sales: Judy, Pui, Jets, Trin, Nueng, Tonpalm
+Optical: Jib, Jajah, Kio, Toy, Kwang, Mark
+Optometry: Dr.Fair, Dr.Benz, Dr.Milk, Dr.Lookaew
+Regional/Other: Peanut, Jame
+
 == โครงสร้างพื้นที่ (ใหม่ เม.ย. 2026) ==
 5 พื้นที่: Megastore / Metropolitan / North+Central / West+NE / South+Eastern
 
@@ -339,8 +345,21 @@ Program (6-10): สื่อการสอน, กิจกรรม, สถา
 - OWNDAYS Connect: od-connect.com (WIX) — มีทั้ง Web และ App (Android/iOS)
 - ลงทะเบียน: od-connect.com/oar-owndays-academy-registration
 - Survey: od-connect.com/oar-survey
-- Dashboard: HTML + Chart.js + Google Apps Script API
+- Dashboard: HTML + Chart.js v4.4.1 + Google Apps Script API v6
 - ข้อมูลเก็บใน Google Drive และ Google Sheets
+- New Raw Data Folder: https://drive.google.com/drive/folders/1M_omBsJNJb-kJKp1nRAo88TD6fYCeTnL
+
+== L&D Dashboard (GAS API v6) ==
+Dashboard Tabs ทั้งหมด 11 tabs:
+Active (4): Trainers (Trainer KPI/ranking), Training (Survey+OAR), L&D Cost (Budget vs Actual), L&D Asset (Laptop/iPad)
+Placeholder รอพัฒนา (7): Academy, Assessment, Content Management, Employee Management, Store Service Performance, Lens Management, Contact Lens Management
+API Actions: action=survey, cost, asset, oar, ping, all (ใส่ year filter ได้)
+
+== เอกสารอ้างอิง ==
+- LD_Manual_Ver_24.pdf — คู่มือ L&D ฉบับเต็ม
+- Official_LD_LMS_by_Academy.pdf — LMS Academy Framework ทุกหลักสูตร
+- Official_LD_Organization_Chart.pdf — Org Chart แผนก L&D
+- OWNDAYS Employee Framework — เส้นทางการเรียนรู้ Basic → Moderate → Mastery
 
 == สาขาทั้งหมด ==
 MEGA Bangna, Zpell @ Future Park, Central Eastville, Seacon Bangkae, Seacon Square, Fashion Island, The Mall Korat, Central Udon, Central Chiangmai, Gaysorn Village Premium Store, Central Mahachai, Central Phuket, Central Westgate, CentralWorld, Terminal 21 Pattaya, ICONSIAM, Gateway Bangsue, Donki Mall Thonglor, Central Rama 3, Central Village (Outlet), Central Hatyai, Central Rayong, Siam Premium Outlets, Siam Center, Central Salaya, Central Pinklao, Central Rama 2, Central Si Racha, Central Ayutthaya, Central Khonkaen, Central Chanthaburi, Terminal 21 Rama 3, Central Ramindra, Central Chiangrai, Central Samui, Central Nakhon Si, Marche Thonglor, Park Silom, The Mall Bangkae, Central Westville, Central Nakhon Pathom, True Digital Park, V-Square Plaza Nakhon Sawan, Makro Sri Ayutthaya, Central Rama 9, One Bangkok, Robinson Ratchaburi, Market Village Huahin, Lotus's Mall Makro Sathon, Robinson Lifestyle Kanchanaburi, Esplanade Ratchada, Charn At The Avenue, Siam Square One, Robinson Latkrabang, The Mall Bang Kapi, Maya Chiangmai, Robinson Lifestyle Chachoengsao, Central Chiangmai Airport, Central Krabi, Outlet Square Muang Thong Thani, Robinson Lifestyle Saraburi, Robinson Lifestyle Trang, Robinson Lifestyle Chonburi, Robinson Lifestyle Suphanburi, Robinson Lifestyle Buriram, The Glass Market Bangna, Imperial Samrong, Central Phitsanulok, Robinson Suphanburi, Central Lampang, Central Khonkaen Campus, Central Surat Thani, Central Northville, Happitat Bangna, Central Chaengwattana, Robinson Prachinburi, Robinson Phetchaburi, Central Park, The Central Phaholyothin และอื่นๆในอนาคต
@@ -439,7 +458,7 @@ def reply_message(reply_token, text):
 # =============================================================
 @app.route("/", methods=["GET"])
 def health_check():
-    return "LD Secretary Bot v6 - Rocket is running!", 200
+    return "LD Secretary Bot v28 - Rocket is running!", 200
 
 
 @app.route("/webhook", methods=["POST"])
