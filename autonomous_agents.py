@@ -423,8 +423,8 @@ def pixel_watch() -> dict:
     try:
         log_agent("pixel", "scheduler", "[watch] เริ่มตรวจ uptime + ดึง analytics")
 
-        from wix_api import (check_site_uptime, check_pages_uptime,
-                              get_analytics_overview, get_blog_posts, wix_ready)
+        from wix_api import check_site_uptime, check_pages_uptime, get_blog_posts, wix_ready
+        from ga4_api import get_full_analytics, ga4_ready
 
         # ── Uptime ───────────────────────────────────────────────
         uptime       = check_site_uptime()
@@ -432,11 +432,14 @@ def pixel_watch() -> dict:
         down_pages   = [p for p in pages_status if not p.get("ok")]
         slow_pages   = [p for p in pages_status if p.get("ok") and p.get("latency_ms", 0) > 3000]
 
-        # ── Analytics 7 วัน ─────────────────────────────────────
-        analytics = get_analytics_overview(days=7) if wix_ready() else {"error": "WIX API ไม่พร้อม"}
-        posts     = get_blog_posts(limit=5) if wix_ready() else []
+        # ── GA4 Analytics 7 วัน ──────────────────────────────────
+        analytics = get_full_analytics(days=7) if ga4_ready() else {
+            "overview": {"error": "GA4 ยังไม่พร้อม — รอ share property กับ service account"},
+            "top_countries": [], "top_pages": [], "traffic_sources": [], "devices": []
+        }
+        posts = get_blog_posts(limit=5) if wix_ready() else []
 
-        log_agent("pixel", "wix_api", "ดึง analytics 7 วัน",
+        log_agent("pixel", "ga4_api", "ดึง analytics 7 วัน",
                   f"sessions={analytics.get('overview',{}).get('sessions','?')}")
 
         overview   = analytics.get("overview", {})
