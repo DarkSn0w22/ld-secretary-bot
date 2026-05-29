@@ -475,18 +475,58 @@ def verify_signature(body, signature):
 
 def reply_message(reply_token, text):
     messages = []
-    while text:
-        chunk = text[:5000]
-        messages.append({"type": "text", "text": chunk})
-        text = text[5000:]
-
+    remaining = text
+    while remaining:
+        messages.append({"type": "text", "text": remaining[:5000]})
+        remaining = remaining[5000:]
     url = "https://api.line.me/v2/bot/message/reply"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"
-    }
+    headers = {"Content-Type": "application/json",
+               "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
     payload = {"replyToken": reply_token, "messages": messages[:5]}
-    requests.post(url, headers=headers, json=payload)
+    requests.post(url, headers=headers, json=payload, timeout=10)
+
+
+def push_to_user(user_id: str, text: str):
+    """Push message ถึง user โดยตรง (ไม่ต้องใช้ reply token)"""
+    messages = []
+    remaining = text
+    while remaining:
+        messages.append({"type": "text", "text": remaining[:5000]})
+        remaining = remaining[5000:]
+    url = "https://api.line.me/v2/bot/message/push"
+    headers = {"Content-Type": "application/json",
+               "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
+    payload = {"to": user_id, "messages": messages[:5]}
+    try:
+        requests.post(url, headers=headers, json=payload, timeout=15)
+    except Exception as e:
+        print(f"push_to_user error: {e}")
+
+
+def estimate_ack(message: str) -> str:
+    """ตอบรับทันที พร้อมประมาณเวลา ตามความซับซ้อนของ task"""
+    msg = message.lower()
+
+    # Multi-agent / heavy tasks
+    heavy = ["กระจาย", "ทุก agent", "ทุกแผนก", "ทุกตัว", "ภาพรวม",
+             "รายงาน", "สรุปทั้งหมด", "วิเคราะห์ทั้ง", "ช่วยกัน"]
+    # Single agent calls
+    medium = ["atlas", "pulse", "sage", "guard", "coin", "lex",
+              "people", "pixel", "sigma", "lens", "rex",
+              "วิเคราะห์", "ตรวจสอบ", "เช็ค", "หา", "ค้นหา",
+              "survey", "oar", "budget", "sales", "trainer"]
+
+    if any(k in msg for k in heavy):
+        eta = "ประมาณ 1-2 นาที"
+        note = "กำลังประสานงานกับหลาย agent"
+    elif any(k in msg for k in medium):
+        eta = "ประมาณ 30-60 วินาที"
+        note = "กำลังส่งงานไปยัง agent ที่รับผิดชอบ"
+    else:
+        eta = "ประมาณ 10-20 วินาที"
+        note = "กำลังดำเนินการ"
+
+    return f"⚙️ รับทราบครับ {note} คาดว่าได้คำตอบภายใน {eta} ครับ"
 
 
 # =============================================================
@@ -495,6 +535,36 @@ def reply_message(reply_token, text):
 @app.route("/", methods=["GET"])
 def health_check():
     return "LD Secretary Bot v30 - Rocket is running!", 200
+
+
+def _process_text_async(user_id: str, user_message: str):
+    """รันใน background thread — ประมวลผลแล้ว push ผลกลับ"""
+    try:
+        result = get_claude_response(user_id, user_message)
+        print(f"Bot: {result[:100]}...")
+        push_to_user(user_id, result)
+    except Exception as e:
+        print(f"Async processing error: {e}")
+        push_to_user(user_id, f"ขอโทษครับ เกิดข้อผิดพลาด: {e}")
+
+
+def _process_file_async(user_id: str, msg_id: str, file_name: str):
+    """รันใน background thread — parse ไฟล์แล้ว push ผลให้ Rex"""
+    try:
+        file_bytes = download_line_file(msg_id)
+        fn_lower = file_name.lower()
+        if fn_lower.endswith((".xlsx", ".xls")):
+            sales_text = parse_excel_to_text(file_bytes)
+        elif fn_lower.endswith(".pdf"):
+            sales_text = parse_pdf_sales_report(file_bytes)
+        else:
+            sales_text = file_bytes.decode("utf-8", errors="replace")
+
+        task = f"วิเคราะห์ไฟล์ Sales รายสัปดาห์ที่ส่งมา ชื่อไฟล์: {file_name}"
+        result = run_retail_md(task, sales_file_content=sales_text)
+        push_to_user(user_id, result)
+    except Exception as e:
+        push_to_user(user_id, f"ขอโทษครับ วิเคราะห์ไฟล์ไม่ได้: {e}")
 
 
 @app.route("/webhook", methods=["POST"])
@@ -508,52 +578,55 @@ def webhook():
     events = json.loads(body).get("events", [])
 
     for event in events:
+
+        # ── ข้อความ text ──
         if event["type"] == "message" and event["message"]["type"] == "text":
-            user_id = event["source"]["userId"]
+            user_id     = event["source"]["userId"]
             user_message = event["message"]["text"]
-            reply_token = event["replyToken"]
+            reply_token  = event["replyToken"]
+            cmd          = user_message.strip()
 
-            print(f"User {user_id[:8]}...: {user_message}")
+            print(f"User {user_id[:8]}...: {user_message[:60]}")
 
-            # Special commands
-            if user_message.strip() == "/myid":
+            # Special commands — reply ทันที ไม่ต้อง async
+            if cmd == "/myid":
                 reply_message(reply_token, f"Your LINE User ID:\n{user_id}")
-            elif user_message.strip() == "/clearmemory":
+            elif cmd == "/clearmemory":
                 success = clear_history(user_id)
                 reply_message(reply_token, "ลบความจำทั้งหมดแล้วครับ 🗑️" if success else "เกิดข้อผิดพลาดครับ")
-            elif user_message.strip() == "/memstats":
+            elif cmd == "/memstats":
                 count = get_message_count(user_id)
                 reply_message(reply_token, f"มีข้อความในความจำทั้งหมด {count} ข้อความครับ 🧠")
             else:
-                response = get_claude_response(user_id, user_message)
-                print(f"Bot: {response[:100]}...")
-                reply_message(reply_token, response)
+                # 1️⃣ ตอบรับทันที + บอก ETA
+                reply_message(reply_token, estimate_ack(user_message))
+                # 2️⃣ ประมวลผลใน background → push ผลเมื่อเสร็จ
+                import threading
+                threading.Thread(
+                    target=_process_text_async,
+                    args=(user_id, user_message),
+                    daemon=True
+                ).start()
 
-        # ── รับไฟล์ Sales จาก LINE (Excel/CSV) → ส่งให้ Rex ──
+        # ── ไฟล์ (Excel/PDF) → Rex ──
         elif event["type"] == "message" and event["message"]["type"] == "file":
-            user_id    = event["source"]["userId"]
-            reply_token = event["replyToken"]
-            msg        = event["message"]
-            file_name  = msg.get("fileName", "sales_file")
-            msg_id     = msg["id"]
+            user_id     = event["source"]["userId"]
+            reply_token  = event["replyToken"]
+            msg          = event["message"]
+            file_name    = msg.get("fileName", "sales_file")
+            msg_id       = msg["id"]
 
-            reply_message(reply_token, f"📂 ได้รับไฟล์ '{file_name}' แล้วครับ กำลังให้ Rex วิเคราะห์...")
-
-            try:
-                file_bytes = download_line_file(msg_id)
-                fn_lower = file_name.lower()
-                if fn_lower.endswith((".xlsx", ".xls")):
-                    sales_text = parse_excel_to_text(file_bytes)
-                elif fn_lower.endswith(".pdf"):
-                    sales_text = parse_pdf_sales_report(file_bytes)
-                else:
-                    sales_text = file_bytes.decode("utf-8", errors="replace")
-
-                task = f"วิเคราะห์ไฟล์ Sales รายสัปดาห์ที่ส่งมา ชื่อไฟล์: {file_name}"
-                result = run_retail_md(task, sales_file_content=sales_text)
-                reply_message(reply_token, result)
-            except Exception as e:
-                reply_message(reply_token, f"ขอโทษครับ วิเคราะห์ไฟล์ไม่ได้: {e}")
+            # 1️⃣ ตอบรับทันที
+            reply_message(reply_token,
+                f"📂 ได้รับไฟล์ '{file_name}' แล้วครับ\n"
+                f"⚙️ กำลังให้ Rex วิเคราะห์ คาดว่าได้ผลภายใน 1-2 นาที ครับ")
+            # 2️⃣ parse + วิเคราะห์ใน background → push ผล
+            import threading
+            threading.Thread(
+                target=_process_file_async,
+                args=(user_id, msg_id, file_name),
+                daemon=True
+            ).start()
 
     return "OK", 200
 
