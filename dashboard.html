@@ -886,31 +886,24 @@ function processSprite(img, id) {
   bg.onerror = () => { bgReady = false; console.warn('[BG] load failed'); };
   bg.src = '/static/office_bg.png';
 
-  // Sprites — crossOrigin for getImageData (white removal)
+  // Sprites — load without crossOrigin (safest, works everywhere)
+  // white removal via try-catch getImageData (fails gracefully if CORS blocks)
   const allIds = AGENTS.map(a => a.id).concat(['peanut']);
   const total = allIds.length;
 
-  function checkAllDone() {
-    if (spritesLoaded >= total) {
-      spritesReady = true;
-      console.log('[Sprites] all', spritesLoaded, 'loaded');
-    }
-  }
-
   allIds.forEach(agentId => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       processSprite(img, agentId);
       spritesLoaded++;
-      checkAllDone();
+      if (spritesLoaded >= total) {
+        spritesReady = true;
+        console.log('[Sprites] ready:', spritesLoaded);
+      }
     };
     img.onerror = () => {
-      // ถ้าโหลดด้วย crossOrigin ไม่ได้ — ลองใหม่ไม่มี crossOrigin
-      const img2 = new Image();
-      img2.onload = () => { processSprite(img2, agentId); spritesLoaded++; checkAllDone(); };
-      img2.onerror = () => { spritesLoaded++; checkAllDone(); };
-      img2.src = '/static/' + agentId + '.png?nc=' + Date.now();
+      spritesLoaded++;
+      if (spritesLoaded >= total) { spritesReady = true; }
     };
     img.src = '/static/' + agentId + '.png';
   });
