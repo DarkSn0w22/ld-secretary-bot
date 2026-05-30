@@ -373,7 +373,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 
       <!-- LEFT: agents list -->
       <div class="lpanel">
-        <div class="ph">AI Agents <span class="ph-badge">12 ACTIVE</span></div>
+        <div class="ph">AI Agents <span class="ph-badge" style="color:#ffd700;">👑 BOSS + 12</span></div>
         <div class="alist" id="alist"></div>
       </div>
 
@@ -670,6 +670,164 @@ let selId = null;
 let taskCount = 0;
 let scaleX = 1, scaleY = 1;
 
+// ─── BOSS: Peanut — Regional L&D Manager ──────────────────────
+const BOSS = {
+  id: 'peanut', name: 'Peanut', em: '👑',
+  role: 'Regional L&D Manager',
+  color: '#ffd700',
+  tools: ['Monitor All','Approve','Escalate','Strategy']
+};
+
+// Boss walker — เดินตรวจงานทั่วออฟฟิศ
+const bossWalker = {
+  agent: BOSS,
+  x: 290, y: 165,    // เริ่มตรงกลางออฟฟิศ
+  deskX: 290, deskY: 165,
+  tx: 290, ty: 165,
+  state: 'patrol',   // patrol | inspect | sit
+  dir: 'down',
+  frame: 0, frameTick: 0,
+  patrolTick: 0,
+  bubble: '', bubbleTick: 0,
+  targetAgent: null, // agent ที่กำลัง inspect อยู่
+  busy: false,
+};
+
+const BOSS_PATROL_LINES = [
+  'checking on team...', 'reviewing progress...', 'monitoring KPIs...',
+  'how are we doing?', 'on my rounds...', 'keep up the good work!',
+  'any updates?', 'stay focused ครับ', 'great teamwork!',
+];
+
+function updateBoss(dt) {
+  const b = bossWalker;
+  b.frameTick += dt;
+  if (b.frameTick > 200) { b.frame++; b.frameTick = 0; }
+  if (b.bubbleTick > 0) b.bubbleTick -= dt;
+  if (b.bubbleTick <= 0) b.bubble = '';
+
+  b.patrolTick -= dt;
+
+  if (b.state === 'patrol' || b.state === 'sit') {
+    if (b.patrolTick <= 0) {
+      // หา busy agent ที่ใกล้ที่สุด → เดินไปตรวจ
+      const busyAgents = walkers.filter(w => w.busy || busStatus[w.agent.id]?.status === 'busy');
+      if (busyAgents.length > 0 && Math.random() < 0.6) {
+        const target = busyAgents[Math.floor(Math.random() * busyAgents.length)];
+        b.tx = target.x + 18;
+        b.ty = target.y;
+        b.state = 'inspect';
+        b.targetAgent = target.agent.id;
+        b.bubble = `checking ${target.agent.name}...`;
+        b.bubbleTick = 3500;
+      } else {
+        // เดิน patrol ทั่วออฟฟิศ
+        const t = randomWanderTarget();
+        b.tx = t.tx; b.ty = t.ty;
+        b.state = 'patrol';
+        b.patrolTick = 4000 + Math.random() * 6000;
+        if (Math.random() < 0.4) {
+          b.bubble = BOSS_PATROL_LINES[Math.floor(Math.random() * BOSS_PATROL_LINES.length)];
+          b.bubbleTick = 2500;
+        }
+      }
+    }
+  }
+
+  // เคลื่อนไหว
+  const dx = b.tx - b.x, dy = b.ty - b.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const speed = 0.07 * dt;
+  if (dist < speed + 1) {
+    b.x = b.tx; b.y = b.ty;
+    if (b.state === 'inspect') {
+      // หยุดดูสักครู่แล้วกลับ patrol
+      b.patrolTick = 3000 + Math.random() * 3000;
+      b.state = 'patrol';
+      b.targetAgent = null;
+    } else {
+      b.patrolTick = 2000 + Math.random() * 4000;
+    }
+  } else {
+    if (isWalkable(b.x + (dx/dist)*speed, b.y + (dy/dist)*speed)) {
+      b.x += (dx/dist)*speed;
+      b.y += (dy/dist)*speed;
+    } else {
+      const t = randomWanderTarget(); b.tx = t.tx; b.ty = t.ty;
+    }
+    if (Math.abs(dx) > Math.abs(dy)) b.dir = dx > 0 ? 'right' : 'left';
+    else b.dir = dy > 0 ? 'down' : 'up';
+  }
+}
+
+function drawBoss() {
+  const b = bossWalker;
+  const moving = b.state !== 'sit';
+  ctx.save();
+
+  // Gold glow aura
+  const aura = ctx.createRadialGradient(px(b.x), py(b.y)-ps(10), 0, px(b.x), py(b.y)-ps(10), ps(28));
+  aura.addColorStop(0, 'rgba(255,215,0,0.18)');
+  aura.addColorStop(1, 'transparent');
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.ellipse(px(b.x), py(b.y)-ps(10), ps(28), ps(28), 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(px(b.x), py(b.y)+ps(8), ps(10), ps(2.5), 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Boss sprite (/static/peanut.png) หรือ fallback
+  const spr = agentSprites['peanut'];
+  const dH = ps(60);  // Boss ใหญ่กว่า agents
+  const dW = dH;
+  const bob = moving ? (b.frame%2===0 ? -ps(2) : ps(0.5)) : 0;
+  const drawX = px(b.x) - dW/2;
+  const drawY = py(b.y) - dH*0.82 + bob;
+
+  ctx.imageSmoothingEnabled = true;
+  if (b.dir === 'left') { ctx.translate(px(b.x)*2, 0); ctx.scale(-1, 1); }
+
+  if (spr) {
+    ctx.drawImage(spr, 0, 0, SPR_SIZE, SPR_SIZE, drawX, drawY, dW, dH);
+  } else {
+    // Fallback: วาด boss pixel art
+    ctx.fillStyle = '#b8860b';
+    ctx.fillRect(px(b.x)-dW/2, drawY, dW, dH*0.85);
+    ctx.fillStyle = '#ffd700';
+    ctx.font = `${ps(22)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('👑', px(b.x), drawY + dH*0.3 + bob);
+    ctx.fillStyle = '#f5c9a0';
+    ctx.font = `${ps(10)}px serif`;
+    ctx.fillText('😎', px(b.x), drawY + dH*0.55 + bob);
+  }
+
+  // Crown emoji บนหัว
+  const emBounce = Math.sin(Date.now()/500) * ps(2);
+  ctx.font = `${ps(11)}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('👑', px(b.x), py(b.y) - ps(56) + emBounce);
+
+  ctx.restore();
+
+  // Name label — gold
+  ctx.save();
+  ctx.font = `bold ${ps(5)}px 'Press Start 2P'`;
+  ctx.fillStyle = '#ffd700';
+  ctx.textAlign = 'center';
+  ctx.shadowBlur = ps(6); ctx.shadowColor = 'rgba(255,215,0,0.6)';
+  ctx.fillText('PEANUT', px(b.x), py(b.y) + ps(16));
+  ctx.restore();
+
+  // Bubble
+  if (b.bubble) drawBubble(b.x, b.y, b.bubble, '#ffd700');
+}
+
 // ─── Asset loading ───────────────────────────────────────────
 let bgImg = null, bgReady = false;
 const agentSprites = {};   // agent_id → Image (individual 200×200 PNGs)
@@ -714,6 +872,23 @@ const SPR_SIZE = 200;      // each sprite is 200×200
     img.onerror = () => { spritesLoaded++; };
     img.src = '/static/' + a.id + '.png';
   });
+  // Boss sprite (peanut.png หรือ fallback ถ้าไม่มี)
+  const bossImg = new Image();
+  bossImg.crossOrigin = 'anonymous';
+  bossImg.onload = () => {
+    const sc = document.createElement('canvas');
+    sc.width = SPR_SIZE; sc.height = SPR_SIZE;
+    const sctx = sc.getContext('2d');
+    sctx.drawImage(bossImg, 0, 0, SPR_SIZE, SPR_SIZE);
+    try {
+      const id = sctx.getImageData(0,0,SPR_SIZE,SPR_SIZE);
+      const d = id.data;
+      for(let i=0;i<d.length;i+=4) if(d[i]>220&&d[i+1]>220&&d[i+2]>220) d[i+3]=0;
+      sctx.putImageData(id, 0, 0);
+    } catch(e) {}
+    agentSprites['peanut'] = sc;
+  };
+  bossImg.src = '/static/peanut.png';  // ถ้าไม่มีจะ fallback วาดเอง
 })();
 
 function resizeCanvas() {
@@ -1009,6 +1184,8 @@ function update(ts) {
       else { w.x+=(dx/dist)*speed; w.y+=(dy/dist)*speed; if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up'; }
     }
   });
+  // อัพเดต Boss ด้วย
+  updateBoss(dt);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1019,10 +1196,12 @@ function render(ts) {
   update(ts);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawRoom();
-  // No drawDesk — furniture is in the background image
-  // Draw characters sorted by y (back to front) for correct layering
-  const sorted = [...walkers].sort((a,b) => a.y - b.y);
+  // วาดตัวละครทั้งหมดเรียงตาม y (back to front)
+  // รวม boss ใน sorted list ด้วย
+  const allWalkers = [...walkers, bossWalker];
+  const sorted = allWalkers.sort((a,b) => a.y - b.y);
   sorted.forEach(w => {
+    if (w.agent.id === 'peanut') { drawBoss(); return; }
     drawChar(w);
     if(w.bubble) drawBubble(w.x, w.y, w.bubble, w.agent.color);
     // Name label below character
@@ -1091,7 +1270,27 @@ setInterval(fetchAgentStatus, 3000);
 function renderList() {
   const el = document.getElementById('alist');
   if(!el) return;
-  el.innerHTML = AGENTS.map(a => {
+
+  // ── Boss card (top, gold) ──────────────────────────────────
+  const bossStatus = bossWalker.state;
+  const bossLabel = bossStatus === 'inspect'
+    ? `monitoring ${bossWalker.targetAgent || '...'}` : 'on patrol 👀';
+  const bossCard = `
+    <div class="acard sel" style="--ac:#ffd700;border-color:#ffd700;
+      background:linear-gradient(135deg,#1a1400,#0f0b00);margin-bottom:6px;">
+      <div class="arow">
+        <span class="aem">👑</span>
+        <div class="ainfo">
+          <div class="aname" style="color:#ffd700;text-shadow:0 0 8px rgba(255,215,0,.5);">Peanut</div>
+          <div class="arole">Regional L&D Manager</div>
+        </div>
+        <div class="adot" style="background:#ffd700;box-shadow:0 0 6px #ffd700;animation:bk 1s infinite;"></div>
+      </div>
+      <div class="astate" style="color:#b8860b;">${bossLabel}</div>
+    </div>
+    <div style="height:1px;background:linear-gradient(90deg,#ffd70033,transparent);margin:0 4px 8px;"></div>`;
+
+  el.innerHTML = bossCard + AGENTS.map(a => {
     const w = walkers.find(x=>x.agent.id===a.id);
     const bs = busStatus[a.id];  // real bus status
     // Merge: bus says busy → show busy; else use walker animation state
