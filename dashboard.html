@@ -602,20 +602,21 @@ const DW = 560, DH = 280;
 // ── Room boundaries per agent (image 1536×1024 → virtual 560×280) ──
 // แต่ละ agent อยู่ในห้องของตัวเอง ไม่ข้ามห้องได้
 // kx=0.3646, ky=0.2734, margin=10
+// พื้นที่เดินได้ = พื้นสีเทาเข้มเท่านั้น (คำนวณจากสี pixel จริงในรูป)
 const ROOM_BOUNDS = {
-  peanut: {xMin:10,   xMax:112,  yMin:39,  yMax:128}, // Boss corner office
-  rocket: {xMin:132,  xMax:222,  yMin:39,  yMax:128}, // 1. Rocket
-  atlas:  {xMin:242,  xMax:331,  yMin:39,  yMax:128}, // 2. Atlas
-  pulse:  {xMin:351,  xMax:440,  yMin:39,  yMax:128}, // 3. Pulse
-  sage:   {xMin:460,  xMax:550,  yMin:39,  yMax:128}, // 4. Sage
-  guard:  {xMin:14,   xMax:126,  yMin:153, yMax:193}, // 5. Guard  (margin+5)
-  coin:   {xMin:154,  xMax:266,  yMin:153, yMax:193}, // 6. Coin
-  lex:    {xMin:294,  xMax:406,  yMin:153, yMax:193}, // 7. Lex
-  people: {xMin:434,  xMax:546,  yMin:153, yMax:193}, // 8. People
-  pixel:  {xMin:14,   xMax:126,  yMin:221, yMax:261}, // 9. Pixel  (margin+5)
-  sigma:  {xMin:154,  xMax:266,  yMin:221, yMax:261}, // 10. Sigma
-  lens:   {xMin:294,  xMax:406,  yMin:221, yMax:261}, // 11. Lens
-  rex:    {xMin:434,  xMax:546,  yMin:221, yMax:261}, // 12. Rex
+  peanut: {xMin:14,   xMax:108,  yMin:80,  yMax:124}, // Boss — floor area
+  rocket: {xMin:134,  xMax:220,  yMin:80,  yMax:124}, // 1. Rocket
+  atlas:  {xMin:244,  xMax:329,  yMin:80,  yMax:124}, // 2. Atlas
+  pulse:  {xMin:353,  xMax:438,  yMin:80,  yMax:124}, // 3. Pulse
+  sage:   {xMin:462,  xMax:548,  yMin:80,  yMax:124}, // 4. Sage
+  guard:  {xMin:14,   xMax:128,  yMin:170, yMax:195}, // 5. Guard
+  coin:   {xMin:152,  xMax:268,  yMin:170, yMax:195}, // 6. Coin
+  lex:    {xMin:292,  xMax:408,  yMin:170, yMax:195}, // 7. Lex
+  people: {xMin:432,  xMax:548,  yMin:170, yMax:195}, // 8. People
+  pixel:  {xMin:14,   xMax:128,  yMin:243, yMax:272}, // 9. Pixel
+  sigma:  {xMin:152,  xMax:268,  yMin:243, yMax:272}, // 10. Sigma
+  lens:   {xMin:292,  xMax:408,  yMin:243, yMax:272}, // 11. Lens
+  rex:    {xMin:432,  xMax:548,  yMin:243, yMax:272}, // 12. Rex
 };
 
 function inRoom(agentId, x, y) {
@@ -634,19 +635,20 @@ function roomWanderTarget(agentId) {
 }
 
 // Desk positions — center of each agent's room (image 1536×1024 → virtual 560×280)
+// Desk = center ของพื้นที่เดินได้ในแต่ละห้อง
 const DESK_POSITIONS = [
-  {x:177, y:83},   // 1. Rocket
-  {x:286, y:83},   // 2. Atlas
-  {x:396, y:83},   // 3. Pulse
-  {x:505, y:83},   // 4. Sage
-  {x: 70, y:175},  // 5. Guard   (ต่ำลงเพื่อ top clearance)
-  {x:210, y:175},  // 6. Coin
-  {x:350, y:175},  // 7. Lex
-  {x:490, y:175},  // 8. People
-  {x: 70, y:244},  // 9. Pixel
-  {x:210, y:244},  // 10. Sigma
-  {x:350, y:244},  // 11. Lens
-  {x:490, y:244},  // 12. Rex
+  {x:177, y:102},  // 1. Rocket  — กลางพื้น row 1
+  {x:287, y:102},  // 2. Atlas
+  {x:396, y:102},  // 3. Pulse
+  {x:505, y:102},  // 4. Sage
+  {x: 71, y:182},  // 5. Guard   — กลางพื้น row 2
+  {x:210, y:182},  // 6. Coin
+  {x:350, y:182},  // 7. Lex
+  {x:490, y:182},  // 8. People
+  {x: 71, y:257},  // 9. Pixel   — กลางพื้น row 3
+  {x:210, y:257},  // 10. Sigma
+  {x:350, y:257},  // 11. Lens
+  {x:490, y:257},  // 12. Rex
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -687,9 +689,9 @@ const BOSS = {
 // Boss walker — เดินตรวจงานทั่วออฟฟิศ
 const bossWalker = {
   agent: BOSS,
-  x: 61, y: 83,      // Boss corner office center
-  deskX: 61, deskY: 83,
-  tx: 61, ty: 83,
+  x: 61, y: 102,     // Boss corner office floor center
+  deskX: 61, deskY: 102,
+  tx: 61, ty: 102,
   state: 'patrol',   // patrol | inspect | sit
   dir: 'down',
   frame: 0, frameTick: 0,
