@@ -602,21 +602,22 @@ const DW = 560, DH = 280;
 // ── Room boundaries per agent (image 1536×1024 → virtual 560×280) ──
 // แต่ละ agent อยู่ในห้องของตัวเอง ไม่ข้ามห้องได้
 // kx=0.3646, ky=0.2734, margin=10
-// พื้นที่เดินได้ = พื้นสีเทาเข้มเท่านั้น (คำนวณจากสี pixel จริงในรูป)
+// พื้นที่เดินได้ = พื้นสีเทาเข้ม (floor tiles) เท่านั้น
+// อ้างอิงจากกรอบแดงที่ user วาง — image 1536×1024 → virtual 560×280
 const ROOM_BOUNDS = {
-  peanut: {xMin:14,   xMax:108,  yMin:80,  yMax:124}, // Boss — floor area
-  rocket: {xMin:134,  xMax:220,  yMin:80,  yMax:124}, // 1. Rocket
-  atlas:  {xMin:244,  xMax:329,  yMin:80,  yMax:124}, // 2. Atlas
-  pulse:  {xMin:353,  xMax:438,  yMin:80,  yMax:124}, // 3. Pulse
-  sage:   {xMin:462,  xMax:548,  yMin:80,  yMax:124}, // 4. Sage
-  guard:  {xMin:14,   xMax:128,  yMin:170, yMax:195}, // 5. Guard
-  coin:   {xMin:152,  xMax:268,  yMin:170, yMax:195}, // 6. Coin
-  lex:    {xMin:292,  xMax:408,  yMin:170, yMax:195}, // 7. Lex
-  people: {xMin:432,  xMax:548,  yMin:170, yMax:195}, // 8. People
-  pixel:  {xMin:14,   xMax:128,  yMin:243, yMax:272}, // 9. Pixel
-  sigma:  {xMin:152,  xMax:268,  yMin:243, yMax:272}, // 10. Sigma
-  lens:   {xMin:292,  xMax:408,  yMin:243, yMax:272}, // 11. Lens
-  rex:    {xMin:432,  xMax:548,  yMin:243, yMax:272}, // 12. Rex
+  peanut: {xMin:14,  xMax:105, yMin:95,  yMax:122}, // Boss corner floor
+  rocket: {xMin:138, xMax:218, yMin:95,  yMax:130}, // 1. Rocket
+  atlas:  {xMin:248, xMax:328, yMin:95,  yMax:130}, // 2. Atlas
+  pulse:  {xMin:358, xMax:435, yMin:95,  yMax:130}, // 3. Pulse
+  sage:   {xMin:464, xMax:544, yMin:95,  yMax:130}, // 4. Sage
+  guard:  {xMin:14,  xMax:125, yMin:172, yMax:193}, // 5. Guard
+  coin:   {xMin:154, xMax:265, yMin:172, yMax:193}, // 6. Coin
+  lex:    {xMin:295, xMax:405, yMin:172, yMax:193}, // 7. Lex
+  people: {xMin:434, xMax:544, yMin:172, yMax:193}, // 8. People
+  pixel:  {xMin:14,  xMax:125, yMin:245, yMax:268}, // 9. Pixel
+  sigma:  {xMin:154, xMax:265, yMin:245, yMax:268}, // 10. Sigma
+  lens:   {xMin:295, xMax:405, yMin:245, yMax:268}, // 11. Lens
+  rex:    {xMin:434, xMax:544, yMin:245, yMax:268}, // 12. Rex
 };
 
 function inRoom(agentId, x, y) {
@@ -638,19 +639,20 @@ function roomWanderTarget(agentId) {
 // Desk positions = เท้าของตัวละคร (feet-at-y)
 // ต้อง y_desk >= yMin_room + dH_virtual + margin
 // dH=ps(26), at typical scale ~26v. yMin+26+2 = safe position
+// Desk = feet position, ตรงกลาง x ของห้อง, y ใกล้ yMax ของ room (feet-at-y)
 const DESK_POSITIONS = [
-  {x:177, y:120},  // 1. Rocket  — row1 room y:80-124, feet at 120
-  {x:287, y:120},  // 2. Atlas
-  {x:396, y:120},  // 3. Pulse
-  {x:505, y:120},  // 4. Sage
-  {x: 71, y:192},  // 5. Guard   — row2 room y:170-195, feet at 192
-  {x:210, y:192},  // 6. Coin
-  {x:350, y:192},  // 7. Lex
-  {x:490, y:192},  // 8. People
-  {x: 71, y:265},  // 9. Pixel   — row3 room y:243-272, feet at 265
-  {x:210, y:265},  // 10. Sigma
-  {x:350, y:265},  // 11. Lens
-  {x:490, y:265},  // 12. Rex
+  {x:178, y:127},  // 1. Rocket
+  {x:288, y:127},  // 2. Atlas
+  {x:397, y:127},  // 3. Pulse
+  {x:504, y:127},  // 4. Sage
+  {x: 70, y:191},  // 5. Guard
+  {x:210, y:191},  // 6. Coin
+  {x:350, y:191},  // 7. Lex
+  {x:489, y:191},  // 8. People
+  {x: 70, y:266},  // 9. Pixel
+  {x:210, y:266},  // 10. Sigma
+  {x:350, y:266},  // 11. Lens
+  {x:489, y:266},  // 12. Rex
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -691,9 +693,9 @@ const BOSS = {
 // Boss walker — เดินตรวจงานทั่วออฟฟิศ
 const bossWalker = {
   agent: BOSS,
-  x: 61, y: 120,     // Boss corner office — เท้าที่ y=120 (ใน room 80-124)
-  deskX: 61, deskY: 120,
-  tx: 61, ty: 120,
+  x: 60, y: 120,     // Boss corner office — เท้าที่ y=120 (ใน room 95-122)
+  deskX: 60, deskY: 120,
+  tx: 60, ty: 120,
   state: 'patrol',   // patrol | inspect | sit
   dir: 'down',
   frame: 0, frameTick: 0,
@@ -1087,12 +1089,20 @@ function drawChar(w) {
     ctx.fillText(agent.em, px(x), py(y)-ps(12)+bob);
   }
 
-  // Emoji hat floating above character
-  const emBounce = busy ? Math.sin(Date.now()/200)*ps(2) : 0;
-  ctx.font = `${ps(9)}px serif`;
+  // ชื่อตัวละครแบบ minimal pill บนหัว (แทน emoji)
+  const nameBounce = busy ? Math.sin(Date.now()/200)*ps(1) : 0;
+  ctx.font = `600 ${ps(3.8)}px 'Sarabun',sans-serif`;
+  const nw = ctx.measureText(agent.name).width + ps(5);
+  const nx = px(x) - nw/2;
+  const ny = py(y) - dH - ps(5) + nameBounce;
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.shadowBlur = ps(3); ctx.shadowColor = 'rgba(0,0,0,.3)';
+  ctx.beginPath(); ctx.roundRect(nx, ny, nw, ps(5.5), ps(1.8)); ctx.fill();
+  ctx.fillStyle = agent.color; ctx.shadowBlur = 0;
+  ctx.fillRect(nx, ny+ps(.3), ps(1.5), ps(4.9));
+  ctx.fillStyle = '#1a2035';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(agent.em, px(x), py(y)-ps(50)+emBounce);
+  ctx.fillText(agent.name, px(x), ny+ps(4));
 
   ctx.restore();
 }
@@ -1220,27 +1230,8 @@ function render(ts) {
   sorted.forEach(w => {
     if (w.agent.id === 'peanut') { drawBoss(); return; }
     drawChar(w);
+    // ชื่ออยู่บนหัวแล้ว (ใน drawChar) ไม่ต้องวาดใต้ตัวอีก
     if(w.bubble) drawBubble(w.x, w.y, w.bubble, w.agent.color);
-    // Name label — small subtle tag matching office style
-    ctx.save();
-    ctx.font = `700 ${ps(4)}px 'Sarabun', sans-serif`;
-    // Pill background
-    const lbl = w.agent.name;
-    const lw = ctx.measureText(lbl).width + ps(4);
-    const lx = px(w.x) - lw/2;
-    const ly = py(w.y) + ps(1);
-    ctx.fillStyle = 'rgba(255,255,255,.88)';
-    ctx.shadowBlur = ps(4); ctx.shadowColor = 'rgba(0,0,0,.25)';
-    ctx.beginPath(); ctx.roundRect(lx, ly, lw, ps(6), ps(2)); ctx.fill();
-    // Color left bar
-    ctx.fillStyle = w.agent.color;
-    ctx.shadowBlur = 0;
-    ctx.fillRect(lx, ly+ps(.5), ps(1.5), ps(5));
-    // Text
-    ctx.fillStyle = '#1a2035';
-    ctx.textAlign = 'center';
-    ctx.fillText(lbl, px(w.x), ly + ps(4.8));
-    ctx.restore();
   });
   if(selId) {
     const w = walkers.find(x=>x.agent.id===selId);
