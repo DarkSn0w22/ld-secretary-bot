@@ -599,48 +599,54 @@ const ctx = canvas.getContext('2d');
 
 const DW = 560, DH = 280;
 
-// ── Walkable floor polygon (image 1264×843 → virtual 560×280) ───
-// Orange boundary from user — walls/shelves/out-of-bounds excluded
-// Scale: kx=0.443, ky=0.332
-const WALK_POLY = [
-  {x:73,  y:275},  // bottom-left
-  {x:60,  y:210},  // left side going up
-  {x:80,  y:152},  // upper-left corner
-  {x:128, y:110},  // bend past bookshelf
-  {x:195, y:97},   // top-left walkable
-  {x:285, y:92},   // top middle-left
-  {x:390, y:88},   // top middle
-  {x:490, y:85},   // top right
-  {x:520, y:100},  // upper-right corner
-  {x:525, y:190},  // right side
-  {x:520, y:275},  // bottom-right
-];
+// ── Room boundaries per agent (image 1536×1024 → virtual 560×280) ──
+// แต่ละ agent อยู่ในห้องของตัวเอง ไม่ข้ามห้องได้
+// kx=0.3646, ky=0.2734, margin=10
+const ROOM_BOUNDS = {
+  peanut: {xMin:10,   xMax:112,  yMin:39,  yMax:128}, // Boss corner office
+  rocket: {xMin:132,  xMax:222,  yMin:39,  yMax:128}, // 1. Rocket
+  atlas:  {xMin:242,  xMax:331,  yMin:39,  yMax:128}, // 2. Atlas
+  pulse:  {xMin:351,  xMax:440,  yMin:39,  yMax:128}, // 3. Pulse
+  sage:   {xMin:460,  xMax:550,  yMin:39,  yMax:128}, // 4. Sage
+  guard:  {xMin:10,   xMax:130,  yMin:148, yMax:196}, // 5. Guard
+  coin:   {xMin:150,  xMax:270,  yMin:148, yMax:196}, // 6. Coin
+  lex:    {xMin:290,  xMax:410,  yMin:148, yMax:196}, // 7. Lex
+  people: {xMin:430,  xMax:550,  yMin:148, yMax:196}, // 8. People
+  pixel:  {xMin:10,   xMax:130,  yMin:216, yMax:266}, // 9. Pixel
+  sigma:  {xMin:150,  xMax:270,  yMin:216, yMax:266}, // 10. Sigma
+  lens:   {xMin:290,  xMax:410,  yMin:216, yMax:266}, // 11. Lens
+  rex:    {xMin:430,  xMax:550,  yMin:216, yMax:266}, // 12. Rex
+};
 
-function pointInPoly(x, y, poly) {
-  let inside = false;
-  for (let i=0, j=poly.length-1; i<poly.length; j=i++) {
-    const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
-    if (((yi>y) !== (yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside = !inside;
-  }
-  return inside;
+function inRoom(agentId, x, y) {
+  const r = ROOM_BOUNDS[agentId];
+  if (!r) return true;
+  return x >= r.xMin && x <= r.xMax && y >= r.yMin && y <= r.yMax;
 }
-function isWalkable(x, y) { return pointInPoly(x, y, WALK_POLY); }
 
-// Desk positions — matched to actual desks visible in office_bg.png
-// image pixel coords (1264×843) scaled to virtual (560×280)
+function roomWanderTarget(agentId) {
+  const r = ROOM_BOUNDS[agentId];
+  if (!r) return {tx: 280, ty: 160};
+  return {
+    tx: r.xMin + Math.random() * (r.xMax - r.xMin),
+    ty: r.yMin + Math.random() * (r.yMax - r.yMin),
+  };
+}
+
+// Desk positions — center of each agent's room (image 1536×1024 → virtual 560×280)
 const DESK_POSITIONS = [
-  {x:170, y:132},  // Rocket  — left desk (holographic screen)
-  {x:255, y:118},  // Atlas   — center-back desk 1
-  {x:325, y:113},  // Pulse   — center-back desk 2
-  {x:440, y:105},  // Sage    — right-back desk
-  {x:500, y:100},  // Guard   — far-right upper station
-  {x:160, y:168},  // Coin    — left middle standing area
-  {x:260, y:163},  // Lex     — center desk row 2
-  {x:340, y:160},  // People  — center-right desk row 2
-  {x:410, y:155},  // Pixel   — right desk row 2
-  {x:480, y:145},  // Sigma   — far-right dashboard station
-  {x:285, y:195},  // Lens    — front multi-monitor station left
-  {x:390, y:190},  // Rex     — front hologram station
+  {x:177, y:83},   // 1. Rocket
+  {x:286, y:83},   // 2. Atlas
+  {x:396, y:83},   // 3. Pulse
+  {x:505, y:83},   // 4. Sage
+  {x: 70, y:172},  // 5. Guard
+  {x:210, y:172},  // 6. Coin
+  {x:350, y:172},  // 7. Lex
+  {x:490, y:172},  // 8. People
+  {x: 70, y:241},  // 9. Pixel
+  {x:210, y:241},  // 10. Sigma
+  {x:350, y:241},  // 11. Lens
+  {x:490, y:241},  // 12. Rex
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -681,9 +687,9 @@ const BOSS = {
 // Boss walker — เดินตรวจงานทั่วออฟฟิศ
 const bossWalker = {
   agent: BOSS,
-  x: 290, y: 165,    // เริ่มตรงกลางออฟฟิศ
-  deskX: 290, deskY: 165,
-  tx: 290, ty: 165,
+  x: 61, y: 83,      // Boss corner office center
+  deskX: 61, deskY: 83,
+  tx: 61, ty: 83,
   state: 'patrol',   // patrol | inspect | sit
   dir: 'down',
   frame: 0, frameTick: 0,
@@ -711,18 +717,21 @@ function updateBoss(dt) {
   if (b.state === 'patrol' || b.state === 'sit') {
     if (b.patrolTick <= 0) {
       // หา busy agent ที่ใกล้ที่สุด → เดินไปตรวจ
+      // Boss อยู่ในห้องตัวเอง แต่แสดงว่ากำลัง monitor agent ที่ busy
       const busyAgents = walkers.filter(w => w.busy || busStatus[w.agent.id]?.status === 'busy');
-      if (busyAgents.length > 0 && Math.random() < 0.6) {
+      if (busyAgents.length > 0 && Math.random() < 0.5) {
         const target = busyAgents[Math.floor(Math.random() * busyAgents.length)];
-        b.tx = target.x + 18;
-        b.ty = target.y;
         b.state = 'inspect';
         b.targetAgent = target.agent.id;
-        b.bubble = `checking ${target.agent.name}...`;
+        b.bubble = `monitoring ${target.agent.name}...`;
         b.bubbleTick = 3500;
+        // อยู่ในห้อง boss เฉยๆ ไม่ได้เดินไปหา
+        const t = roomWanderTarget('peanut');
+        b.tx = t.tx; b.ty = t.ty;
+        b.patrolTick = 4000;
       } else {
-        // เดิน patrol ทั่วออฟฟิศ
-        const t = randomWanderTarget();
+        // เดินในห้อง Boss
+        const t = roomWanderTarget('peanut');
         b.tx = t.tx; b.ty = t.ty;
         b.state = 'patrol';
         b.patrolTick = 4000 + Math.random() * 6000;
@@ -749,11 +758,11 @@ function updateBoss(dt) {
       b.patrolTick = 2000 + Math.random() * 4000;
     }
   } else {
-    if (isWalkable(b.x + (dx/dist)*speed, b.y + (dy/dist)*speed)) {
+    if (inRoom('peanut', b.x + (dx/dist)*speed, b.y + (dy/dist)*speed)) {
       b.x += (dx/dist)*speed;
       b.y += (dy/dist)*speed;
     } else {
-      const t = randomWanderTarget(); b.tx = t.tx; b.ty = t.ty;
+      const t = roomWanderTarget('peanut'); b.tx = t.tx; b.ty = t.ty;
     }
     if (Math.abs(dx) > Math.abs(dy)) b.dir = dx > 0 ? 'right' : 'left';
     else b.dir = dy > 0 ? 'down' : 'up';
@@ -782,7 +791,7 @@ function drawBoss() {
 
   // Boss sprite (/static/peanut.png) หรือ fallback
   const spr = agentSprites['peanut'];
-  const dH = ps(60);  // Boss ใหญ่กว่า agents
+  const dH = ps(44);  // Boss ใหญ่กว่า agents นิดหน่อย
   const dW = dH;
   const bob = moving ? (b.frame%2===0 ? -ps(2) : ps(0.5)) : 0;
   const drawX = px(b.x) - dW/2;
@@ -1038,7 +1047,7 @@ function drawChar(w) {
   const spr = agentSprites[agent.id];
   if (spr) {
     // Square sprite 200×200 → display size
-    const dH = ps(56);   // ใหญ่ขึ้นให้เท่าเก้าอี้ในรูป
+    const dH = ps(36);   // ขนาดพอดีห้อง
     const dW = dH;
 
     const bob = moving ? (frame%2===0 ? -ps(1.5) : ps(0.5)) : 0;
@@ -1143,14 +1152,10 @@ const WANDER_PHRASES = [
   '☕ coffee break','🚶 stretch time','💬 chatting','🎯 wander mode',
 ];
 
-function randomWanderTarget() {
-  // Random point inside the walkable polygon (rejection sampling)
-  for (let i = 0; i < 50; i++) {
-    const tx = 75 + Math.random() * 440;
-    const ty = 90 + Math.random() * 180;
-    if (isWalkable(tx, ty)) return {tx, ty};
-  }
-  return {tx: 250, ty: 160};  // safe fallback center
+function randomWanderTarget(agentId) {
+  // ถ้ามี agent ID → wander ในห้องตัวเอง
+  if (agentId && ROOM_BOUNDS[agentId]) return roomWanderTarget(agentId);
+  return {tx: 61, ty: 83};  // fallback boss room center
 }
 
 let lastTime = 0;
@@ -1163,18 +1168,18 @@ function update(ts) {
     if(w.state==='sit') {
       w.sitTick -= dt;
       if(w.sitTick <= 0) {
-        if(Math.random()<0.35) { const t=randomWanderTarget(); w.tx=t.tx; w.ty=t.ty; w.state='walk'; w.walkTick=200+Math.random()*400; w.bubble=WANDER_PHRASES[Math.floor(Math.random()*WANDER_PHRASES.length)]; w.bubbleTick=2500; }
-        else { w.sitTick=200+Math.random()*400; if(Math.random()<0.3){w.bubble=IDLE_LINES[Math.floor(Math.random()*IDLE_LINES.length)];w.bubbleTick=2000;} }
+        if(Math.random()<0.3) { const t=roomWanderTarget(w.agent.id); w.tx=t.tx; w.ty=t.ty; w.state='walk'; w.walkTick=300+Math.random()*500; w.bubble=WANDER_PHRASES[Math.floor(Math.random()*WANDER_PHRASES.length)]; w.bubbleTick=2500; }
+        else { w.sitTick=300+Math.random()*600; if(Math.random()<0.3){w.bubble=IDLE_LINES[Math.floor(Math.random()*IDLE_LINES.length)];w.bubbleTick=2000;} }
       }
     }
     if(w.state==='walk') {
-      const dx=w.tx-w.x, dy=w.ty-w.y, dist=Math.sqrt(dx*dx+dy*dy), speed=0.065*dt;
-      if(dist<speed+1) { w.x=w.tx; w.y=w.ty; w.walkTick-=dt; if(w.walkTick<=0){ if(Math.random()<0.55){w.tx=w.deskX;w.ty=w.deskY;w.state='return';}else{const t=randomWanderTarget();w.tx=t.tx;w.ty=t.ty;w.walkTick=150+Math.random()*300;} } }
+      const dx=w.tx-w.x, dy=w.ty-w.y, dist=Math.sqrt(dx*dx+dy*dy), speed=0.045*dt;
+      if(dist<speed+1) { w.x=w.tx; w.y=w.ty; w.walkTick-=dt; if(w.walkTick<=0){ if(Math.random()<0.6){w.tx=w.deskX;w.ty=w.deskY;w.state='return';}else{const t=roomWanderTarget(w.agent.id);w.tx=t.tx;w.ty=t.ty;w.walkTick=200+Math.random()*400;} } }
       else {
         const nx=w.x+(dx/dist)*speed, ny=w.y+(dy/dist)*speed;
-        // ห้ามเดินออกนอกพื้นที่ (ถ้าจะออก → หาเป้าหมายใหม่)
-        if(isWalkable(nx, ny)) { w.x=nx; w.y=ny; }
-        else { const t=randomWanderTarget(); w.tx=t.tx; w.ty=t.ty; }
+        // ห้ามออกนอกห้องตัวเอง
+        if(inRoom(w.agent.id, nx, ny)) { w.x=nx; w.y=ny; }
+        else { const t=roomWanderTarget(w.agent.id); w.tx=t.tx; w.ty=t.ty; }
         if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up';
       }
     }
