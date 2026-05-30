@@ -1556,30 +1556,73 @@ let agentCardsRendered = false;
 
 // ─── Tier config per agent ───────────────────────────────────
 const TIERS = {
-  rocket: {t:'LEGENDARY', c:'#ffd700', g:'rgba(255,215,0,.45)'},
-  atlas:  {t:'EPIC',      c:'#b44bff', g:'rgba(180,75,255,.4)'},
-  rex:    {t:'EPIC',      c:'#b44bff', g:'rgba(180,75,255,.4)'},
-  pulse:  {t:'EPIC',      c:'#b44bff', g:'rgba(180,75,255,.4)'},
-  sage:   {t:'RARE',      c:'#4f9eff', g:'rgba(79,158,255,.35)'},
-  guard:  {t:'RARE',      c:'#4f9eff', g:'rgba(79,158,255,.35)'},
-  coin:   {t:'RARE',      c:'#ffd166', g:'rgba(255,209,102,.3)'},
-  lex:    {t:'RARE',      c:'#fb923c', g:'rgba(251,146,60,.3)'},
-  people: {t:'RARE',      c:'#e879f9', g:'rgba(232,121,249,.3)'},
-  pixel:  {t:'COMMON',    c:'#38bdf8', g:'rgba(56,189,248,.25)'},
-  sigma:  {t:'COMMON',    c:'#4ade80', g:'rgba(74,222,128,.25)'},
-  lens:   {t:'COMMON',    c:'#f9a8d4', g:'rgba(249,168,212,.25)'},
+  peanut: {t:'👑 BOSS',    c:'#ffd700', g:'rgba(255,215,0,.5)'},
+  rocket: {t:'LEGENDARY', c:'#4f9eff', g:'rgba(79,158,255,.45)'},
+  atlas:  {t:'EPIC',      c:'#a78bfa', g:'rgba(167,139,250,.4)'},
+  pulse:  {t:'EPIC',      c:'#f472b6', g:'rgba(244,114,182,.4)'},
+  sage:   {t:'EPIC',      c:'#22d3ee', g:'rgba(34,211,238,.4)'},
+  guard:  {t:'RARE',      c:'#38bdf8', g:'rgba(56,189,248,.35)'},
+  coin:   {t:'RARE',      c:'#ffd166', g:'rgba(255,209,102,.35)'},
+  lex:    {t:'RARE',      c:'#e879f9', g:'rgba(232,121,249,.35)'},
+  people: {t:'RARE',      c:'#fb923c', g:'rgba(251,146,60,.35)'},
+  pixel:  {t:'RARE',      c:'#38bdf8', g:'rgba(56,189,248,.3)'},
+  sigma:  {t:'COMMON',    c:'#4ade80', g:'rgba(74,222,128,.3)'},
+  lens:   {t:'COMMON',    c:'#f9a8d4', g:'rgba(249,168,212,.3)'},
+  rex:    {t:'COMMON',    c:'#f97316', g:'rgba(249,115,22,.3)'},
 };
 
-// ─── Draw mini pixel-art sprite on a card canvas ─────────────
 function renderAgentCards() {
   if(agentCardsRendered) return;
   agentCardsRendered = true;
   const grid = document.getElementById('agent-cards');
   if(!grid) return;
 
-  grid.innerHTML = AGENTS.map(a => {
+  // Boss Peanut card (special)
+  const bossCard = (() => {
+    const tier = TIERS['peanut'];
+    return `<div class="gcard" style="--tc:${tier.c};--tg:${tier.g};
+              grid-column: span 2;
+              background:linear-gradient(160deg,#1a1200 0%,#0f0800 100%);">
+      <div class="gtier" style="font-size:8px;">${tier.t}</div>
+      <div class="gonline"></div>
+      <div style="display:flex;align-items:center;gap:0;overflow:hidden;">
+        <div class="gsprite" style="flex-shrink:0;width:130px;height:180px;
+          background:radial-gradient(circle at 50% 70%,${tier.g} 0%,transparent 70%);">
+          <img src="/static/peanut.png" alt="Peanut"
+               style="height:170px;object-fit:contain;
+                      filter:drop-shadow(0 0 10px rgba(255,215,0,.6));"/>
+        </div>
+        <div class="gbody" style="flex:1;padding:14px 14px 14px 8px;">
+          <div style="font-family:'Press Start 2P';font-size:8px;color:#ffd700;
+                      text-shadow:0 0 12px rgba(255,215,0,.6);margin-bottom:6px;">
+            PEANUT
+          </div>
+          <div style="font-size:10px;color:#ffd700;font-weight:700;margin-bottom:2px;">ประธาน AI</div>
+          <div style="font-size:9px;color:#b8860b;margin-bottom:8px;">Regional L&D Manager</div>
+          <div style="font-size:8px;color:var(--text3);line-height:1.6;">
+            ดูแล OWNDAYS Academy<br>Thailand · Cambodia · Laos<br>
+            70 สาขา · 400+ พนักงาน
+          </div>
+          <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
+            <span class="gtool-tag" style="color:#ffd700;border-color:rgba(255,215,0,.4);">Monitor All</span>
+            <span class="gtool-tag" style="color:#ffd700;border-color:rgba(255,215,0,.4);">Approve</span>
+            <span class="gtool-tag" style="color:#ffd700;border-color:rgba(255,215,0,.4);">Strategy</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  })();
+
+  // Agent cards
+  const agentCards = AGENTS.map(a => {
     const tier = TIERS[a.id] || {t:'COMMON', c:'#64748b', g:'rgba(100,116,139,.2)'};
     const toolTags = a.tools.map(t => `<span class="gtool-tag">${t}</span>`).join('');
+    const thaiRoles = {
+      rocket:'เลขา AI', atlas:'ผู้จัดการ AI', pulse:'ผู้จัดการฝึก AI',
+      sage:'นักรายงาน AI', guard:'ตรวจสอบ QA AI', coin:'การเงิน AI',
+      lex:'กฎหมาย AI', people:'HR AI', pixel:'เว็บ AI',
+      sigma:'วิเคราะห์ข้อมูล AI', lens:'สร้างเนื้อหา AI', rex:'ค้าปลีก MD AI'
+    };
     return `<div class="gcard" style="--tc:${tier.c};--tg:${tier.g};"
               onclick="document.querySelector('.ntab.on').classList.remove('on');
                        document.querySelectorAll('.ntab')[0].classList.add('on');
@@ -1588,22 +1631,23 @@ function renderAgentCards() {
                        selectAgent('${a.id}')">
       <div class="gtier">${tier.t}</div>
       <div class="gonline"></div>
-      <div class="gsprite" style="background:radial-gradient(circle at 50% 60%,${tier.g} 0%,transparent 70%);">
+      <div class="gsprite" style="height:170px;background:radial-gradient(circle at 50% 70%,${tier.g} 0%,transparent 70%);">
         <img src="/static/${a.id}.png" alt="${a.name}"
-             style="width:110px;height:110px;object-fit:contain;
-                    filter:drop-shadow(0 0 8px ${tier.g});
+             style="height:160px;max-width:100%;object-fit:contain;
+                    filter:drop-shadow(0 2px 8px ${tier.g});
                     image-rendering:auto;" />
       </div>
       <div class="gbody">
         <div class="gname">${a.name}</div>
-        <div class="grole">${a.role}</div>
+        <div style="font-size:9px;color:${tier.c};margin-top:1px;font-weight:600;">${thaiRoles[a.id]||a.role}</div>
+        <div class="grole" style="margin-top:1px;">${a.role}</div>
         <div class="gtools">${toolTags}</div>
         <div class="glast" id="agent-last-${a.id}">—</div>
       </div>
     </div>`;
   }).join('');
 
-  // No canvas animation needed — using real PNG images
+  grid.innerHTML = bossCard + agentCards;
 }
 
 // ═══════════════════════════════════════════════════════════════
