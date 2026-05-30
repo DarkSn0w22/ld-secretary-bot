@@ -884,7 +884,7 @@ function processSprite(img, id) {
   const bg = new Image();
   bg.onload  = () => { bgImg = bg; bgReady = true; console.log('[BG] ready'); };
   bg.onerror = () => { bgReady = false; console.warn('[BG] load failed'); };
-  bg.src = '/static/office_bg.png';
+  bg.src = '/static/office_bg.png?v=32';  // cache bust
 
   // Sprites — load without crossOrigin (safest, works everywhere)
   // white removal via try-catch getImageData (fails gracefully if CORS blocks)
@@ -905,7 +905,7 @@ function processSprite(img, id) {
       spritesLoaded++;
       if (spritesLoaded >= total) { spritesReady = true; }
     };
-    img.src = '/static/' + agentId + '.png';
+    img.src = '/static/' + agentId + '.png?v=32';  // cache bust
   });
 })();
 
