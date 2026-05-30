@@ -635,20 +635,22 @@ function roomWanderTarget(agentId) {
 }
 
 // Desk positions — center of each agent's room (image 1536×1024 → virtual 560×280)
-// Desk = center ของพื้นที่เดินได้ในแต่ละห้อง
+// Desk positions = เท้าของตัวละคร (feet-at-y)
+// ต้อง y_desk >= yMin_room + dH_virtual + margin
+// dH=ps(26), at typical scale ~26v. yMin+26+2 = safe position
 const DESK_POSITIONS = [
-  {x:177, y:102},  // 1. Rocket  — กลางพื้น row 1
-  {x:287, y:102},  // 2. Atlas
-  {x:396, y:102},  // 3. Pulse
-  {x:505, y:102},  // 4. Sage
-  {x: 71, y:182},  // 5. Guard   — กลางพื้น row 2
-  {x:210, y:182},  // 6. Coin
-  {x:350, y:182},  // 7. Lex
-  {x:490, y:182},  // 8. People
-  {x: 71, y:257},  // 9. Pixel   — กลางพื้น row 3
-  {x:210, y:257},  // 10. Sigma
-  {x:350, y:257},  // 11. Lens
-  {x:490, y:257},  // 12. Rex
+  {x:177, y:120},  // 1. Rocket  — row1 room y:80-124, feet at 120
+  {x:287, y:120},  // 2. Atlas
+  {x:396, y:120},  // 3. Pulse
+  {x:505, y:120},  // 4. Sage
+  {x: 71, y:192},  // 5. Guard   — row2 room y:170-195, feet at 192
+  {x:210, y:192},  // 6. Coin
+  {x:350, y:192},  // 7. Lex
+  {x:490, y:192},  // 8. People
+  {x: 71, y:265},  // 9. Pixel   — row3 room y:243-272, feet at 265
+  {x:210, y:265},  // 10. Sigma
+  {x:350, y:265},  // 11. Lens
+  {x:490, y:265},  // 12. Rex
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -689,9 +691,9 @@ const BOSS = {
 // Boss walker — เดินตรวจงานทั่วออฟฟิศ
 const bossWalker = {
   agent: BOSS,
-  x: 61, y: 102,     // Boss corner office floor center
-  deskX: 61, deskY: 102,
-  tx: 61, ty: 102,
+  x: 61, y: 120,     // Boss corner office — เท้าที่ y=120 (ใน room 80-124)
+  deskX: 61, deskY: 120,
+  tx: 61, ty: 120,
   state: 'patrol',   // patrol | inspect | sit
   dir: 'down',
   frame: 0, frameTick: 0,
@@ -791,19 +793,19 @@ function drawBoss() {
   ctx.ellipse(px(b.x), py(b.y)+ps(8), ps(10), ps(2.5), 0, 0, Math.PI*2);
   ctx.fill();
 
-  // Boss sprite (/static/peanut.png) หรือ fallback
+  // Boss sprite — uniform size, feet at y position
   const spr = agentSprites['peanut'];
-  const dH = ps(44);  // Boss ใหญ่กว่า agents นิดหน่อย
-  const dW = dH;
-  const bob = moving ? (b.frame%2===0 ? -ps(2) : ps(0.5)) : 0;
+  const dH = ps(30);  // Boss ใหญ่กว่า agent นิดหน่อย
+  const dW = spr ? dH * (spr.width / spr.height) : dH;
+  const bob = moving ? (b.frame%2===0 ? -ps(1.5) : ps(0.5)) : 0;
   const drawX = px(b.x) - dW/2;
-  const drawY = py(b.y) - dH*0.82 + bob;
+  const drawY = py(b.y) - dH + bob;  // เท้าที่ y
 
   ctx.imageSmoothingEnabled = true;
   if (b.dir === 'left') { ctx.translate(px(b.x)*2, 0); ctx.scale(-1, 1); }
 
   if (spr) {
-    ctx.drawImage(spr, 0, 0, SPR_SIZE, SPR_SIZE, drawX, drawY, dW, dH);
+    ctx.drawImage(spr, 0, 0, spr.width, spr.height, drawX, drawY, dW, dH);
   } else {
     // Fallback: วาด boss pixel art
     ctx.fillStyle = '#b8860b';
@@ -826,13 +828,21 @@ function drawBoss() {
 
   ctx.restore();
 
-  // Name label — gold
+  // Boss name label — gold pill (same style as agents)
   ctx.save();
-  ctx.font = `bold ${ps(5)}px 'Press Start 2P'`;
-  ctx.fillStyle = '#ffd700';
+  ctx.font = `700 ${ps(4.5)}px 'Sarabun', sans-serif`;
+  const bLbl = '👑 Peanut';
+  const blw = ctx.measureText(bLbl).width + ps(5);
+  const blx = px(b.x) - blw/2;
+  const bly = py(b.y) + ps(1);
+  ctx.fillStyle = 'rgba(255,248,210,.95)';
+  ctx.shadowBlur = ps(5); ctx.shadowColor = 'rgba(255,215,0,.4)';
+  ctx.beginPath(); ctx.roundRect(blx, bly, blw, ps(7), ps(2.5)); ctx.fill();
+  ctx.fillStyle = '#ffd700'; ctx.shadowBlur = 0;
+  ctx.fillRect(blx, bly+ps(.5), ps(2), ps(6));
+  ctx.fillStyle = '#7a5800';
   ctx.textAlign = 'center';
-  ctx.shadowBlur = ps(6); ctx.shadowColor = 'rgba(255,215,0,0.6)';
-  ctx.fillText('PEANUT', px(b.x), py(b.y) + ps(16));
+  ctx.fillText(bLbl, px(b.x), bly + ps(5.5));
   ctx.restore();
 
   // Bubble
@@ -841,65 +851,56 @@ function drawBoss() {
 
 // ─── Asset loading ───────────────────────────────────────────
 let bgImg = null, bgReady = false;
-const agentSprites = {};   // agent_id → Image (individual 200×200 PNGs)
+const agentSprites = {};   // agent_id → canvas (aspect-correct, white removed)
 let spritesLoaded = 0;
 let spritesReady = false;
-const SPR_SIZE = 200;      // each sprite is 200×200
+const SPR_TARGET_H = 300;  // standard stored height (aspect ratio preserved)
+
+function processSprite(img, id) {
+  // Store at correct aspect ratio: height=300, width=proportional
+  const aspect = img.width / img.height;
+  const sc_h = SPR_TARGET_H;
+  const sc_w = Math.round(sc_h * aspect);
+  const sc = document.createElement('canvas');
+  sc.width = sc_w; sc.height = sc_h;
+  const sctx = sc.getContext('2d');
+  sctx.drawImage(img, 0, 0, sc_w, sc_h);
+  try {
+    const id_px = sctx.getImageData(0, 0, sc_w, sc_h);
+    const d = id_px.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i]>215 && d[i+1]>215 && d[i+2]>215) d[i+3] = 0;
+    }
+    sctx.putImageData(id_px, 0, 0);
+  } catch(e) { /* CORS fallback: white bg remains */ }
+  agentSprites[id] = sc;
+}
 
 // ── Load all assets ─────────────────────────────────────────────
 (function loadAssets() {
-  // Background
   const bg = new Image();
   bg.crossOrigin = 'anonymous';
   bg.onload  = () => { bgImg = bg; bgReady = true; };
   bg.onerror = () => console.warn('[BG] load failed');
   bg.src = '/static/office_bg.png';
 
-  // Individual agent sprites — /static/{id}.png
-  AGENTS.forEach(a => {
+  // All 13 sprites (12 agents + boss)
+  const allIds = AGENTS.map(a => a.id).concat(['peanut']);
+  const total = allIds.length;
+  allIds.forEach(id => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // White background removal via canvas
-      const sc = document.createElement('canvas');
-      sc.width = SPR_SIZE; sc.height = SPR_SIZE;
-      const sctx = sc.getContext('2d');
-      sctx.drawImage(img, 0, 0, SPR_SIZE, SPR_SIZE);
-      try {
-        const id = sctx.getImageData(0, 0, SPR_SIZE, SPR_SIZE);
-        const d = id.data;
-        for (let i = 0; i < d.length; i += 4) {
-          if (d[i]>220 && d[i+1]>220 && d[i+2]>220) d[i+3] = 0;
-        }
-        sctx.putImageData(id, 0, 0);
-      } catch(e) { /* CORS fallback */ }
-      agentSprites[a.id] = sc;
+      processSprite(img, id);
       spritesLoaded++;
-      if (spritesLoaded >= AGENTS.length) {
+      if (spritesLoaded >= total) {
         spritesReady = true;
         console.log('[Sprites] all', spritesLoaded, 'ready');
       }
     };
     img.onerror = () => { spritesLoaded++; };
-    img.src = '/static/' + a.id + '.png';
+    img.src = '/static/' + id + '.png';
   });
-  // Boss sprite (peanut.png หรือ fallback ถ้าไม่มี)
-  const bossImg = new Image();
-  bossImg.crossOrigin = 'anonymous';
-  bossImg.onload = () => {
-    const sc = document.createElement('canvas');
-    sc.width = SPR_SIZE; sc.height = SPR_SIZE;
-    const sctx = sc.getContext('2d');
-    sctx.drawImage(bossImg, 0, 0, SPR_SIZE, SPR_SIZE);
-    try {
-      const id = sctx.getImageData(0,0,SPR_SIZE,SPR_SIZE);
-      const d = id.data;
-      for(let i=0;i<d.length;i+=4) if(d[i]>220&&d[i+1]>220&&d[i+2]>220) d[i+3]=0;
-      sctx.putImageData(id, 0, 0);
-    } catch(e) {}
-    agentSprites['peanut'] = sc;
-  };
-  bossImg.src = '/static/peanut.png';  // ถ้าไม่มีจะ fallback วาดเอง
 })();
 
 function resizeCanvas() {
@@ -1049,30 +1050,23 @@ function drawChar(w) {
   const spr = agentSprites[agent.id];
   if (spr) {
     // Square sprite 200×200 → display size
-    // ขนาด sprite ตาม row ของ agent (Row 2/3 ห้องเล็กกว่า)
-    const agentRow = (() => {
-      const r = ROOM_BOUNDS[agent.id];
-      if (!r) return 1;
-      if (r.yMin < 130) return 1;   // Row 1 ห้องสูง
-      if (r.yMin < 210) return 2;   // Row 2 ห้องกลาง
-      return 3;                      // Row 3 ห้องล่าง
-    })();
-    const dH = agentRow === 1 ? ps(34) : ps(26); // Row1=34v, Row2/3=26v
-    const dW = dH;
+    // ขนาดเท่ากันทุกตัว — เท้าอยู่ที่ y, หัวอยู่ข้างบน
+    const dH = ps(26);                         // uniform height
+    const dW = dH * (spr.width / spr.height);  // proportional width (no stretch)
 
-    const bob = moving ? (frame%2===0 ? -ps(1.5) : ps(0.5)) : 0;
+    const bob  = moving ? (frame%2===0 ? -ps(1.5) : ps(0.5)) : 0;
     const glow = busy ? Math.sin(Date.now()/220)*ps(1.5) : 0;
     const drawX = px(x) - dW/2;
-    const drawY = py(y) - dH*0.8 + bob + glow;
+    const drawY = py(y) - dH + bob + glow;   // เท้าที่ y
 
     // Busy aura
     if (busy) {
       ctx.save();
       ctx.globalAlpha = 0.2 + 0.1*Math.sin(Date.now()/300);
-      ctx.shadowBlur = ps(16); ctx.shadowColor = agent.color;
+      ctx.shadowBlur = ps(14); ctx.shadowColor = agent.color;
       ctx.fillStyle = agent.color;
       ctx.beginPath();
-      ctx.ellipse(px(x), drawY+dH*0.55, dW*0.4, dH*0.4, 0, 0, Math.PI*2);
+      ctx.ellipse(px(x), drawY+dH*0.6, dW*0.45, dH*0.4, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
     }
@@ -1082,7 +1076,7 @@ function drawChar(w) {
       ctx.translate(px(x)*2, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(spr, 0, 0, SPR_SIZE, SPR_SIZE, drawX, drawY, dW, dH);
+    ctx.drawImage(spr, 0, 0, spr.width, spr.height, drawX, drawY, dW, dH);
 
   } else {
     // Fallback emoji while sprites load
@@ -1114,32 +1108,34 @@ function shadeColor(col, pct) {
 function drawBubble(x, y, text, color) {
   if(!text) return;
   ctx.save();
-  const fs = ps(5.5);
-  ctx.font = `${fs}px 'Share Tech Mono'`;
+  // Match new corporate office theme — clean white bubble with subtle colored accent
+  const fs = ps(4.8);
+  ctx.font = `600 ${fs}px 'Sarabun', sans-serif`;
   const tw = ctx.measureText(text).width;
-  const pad = ps(5);
+  const pad = ps(4);
   const bw = tw + pad*2, bh = fs + pad*2;
   const bx = px(x) - bw/2;
-  const by = py(y) - ps(42) - bh;
-  ctx.shadowBlur = ps(8);
-  ctx.shadowColor = color;
-  ctx.fillStyle = 'rgba(6,8,16,.95)';
+  const by = py(y) - ps(34) - bh;  // ใกล้หัวตัวละครมากขึ้น
+  // Background: soft white/light with agent color tint
+  ctx.shadowBlur = ps(6);
+  ctx.shadowColor = 'rgba(0,0,0,.3)';
+  ctx.fillStyle = 'rgba(240,244,255,.95)';
   ctx.beginPath();
-  ctx.roundRect(bx, by, bw, bh, ps(3));
+  ctx.roundRect(bx, by, bw, bh, ps(4));
   ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = ps(.8);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(px(x)-ps(4), by+bh);
-  ctx.lineTo(px(x), by+bh+ps(5));
-  ctx.lineTo(px(x)+ps(4), by+bh);
-  ctx.fillStyle = 'rgba(6,8,16,.95)';
-  ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = ps(.8);
-  ctx.stroke();
+  // Left accent bar = agent color
   ctx.fillStyle = color;
+  ctx.shadowBlur = 0;
+  ctx.fillRect(bx, by+ps(2), ps(2.5), bh-ps(4));
+  // Tail
+  ctx.fillStyle = 'rgba(240,244,255,.95)';
+  ctx.beginPath();
+  ctx.moveTo(px(x)-ps(3), by+bh);
+  ctx.lineTo(px(x), by+bh+ps(4));
+  ctx.lineTo(px(x)+ps(3), by+bh);
+  ctx.fill();
+  // Text
+  ctx.fillStyle = '#1a2035';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, px(x), by + bh/2);
@@ -1225,13 +1221,25 @@ function render(ts) {
     if (w.agent.id === 'peanut') { drawBoss(); return; }
     drawChar(w);
     if(w.bubble) drawBubble(w.x, w.y, w.bubble, w.agent.color);
-    // Name label below character
+    // Name label — small subtle tag matching office style
     ctx.save();
-    ctx.font = `bold ${ps(4.5)}px 'Press Start 2P'`;
+    ctx.font = `700 ${ps(4)}px 'Sarabun', sans-serif`;
+    // Pill background
+    const lbl = w.agent.name;
+    const lw = ctx.measureText(lbl).width + ps(4);
+    const lx = px(w.x) - lw/2;
+    const ly = py(w.y) + ps(1);
+    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.shadowBlur = ps(4); ctx.shadowColor = 'rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.roundRect(lx, ly, lw, ps(6), ps(2)); ctx.fill();
+    // Color left bar
     ctx.fillStyle = w.agent.color;
+    ctx.shadowBlur = 0;
+    ctx.fillRect(lx, ly+ps(.5), ps(1.5), ps(5));
+    // Text
+    ctx.fillStyle = '#1a2035';
     ctx.textAlign = 'center';
-    ctx.shadowBlur = ps(4); ctx.shadowColor = 'rgba(0,0,0,.8)';
-    ctx.fillText(w.agent.name, px(w.x), py(w.y) + ps(14));
+    ctx.fillText(lbl, px(w.x), ly + ps(4.8));
     ctx.restore();
   });
   if(selId) {
