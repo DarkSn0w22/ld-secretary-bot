@@ -608,14 +608,14 @@ const ROOM_BOUNDS = {
   atlas:  {xMin:242,  xMax:331,  yMin:39,  yMax:128}, // 2. Atlas
   pulse:  {xMin:351,  xMax:440,  yMin:39,  yMax:128}, // 3. Pulse
   sage:   {xMin:460,  xMax:550,  yMin:39,  yMax:128}, // 4. Sage
-  guard:  {xMin:10,   xMax:130,  yMin:148, yMax:196}, // 5. Guard
-  coin:   {xMin:150,  xMax:270,  yMin:148, yMax:196}, // 6. Coin
-  lex:    {xMin:290,  xMax:410,  yMin:148, yMax:196}, // 7. Lex
-  people: {xMin:430,  xMax:550,  yMin:148, yMax:196}, // 8. People
-  pixel:  {xMin:10,   xMax:130,  yMin:216, yMax:266}, // 9. Pixel
-  sigma:  {xMin:150,  xMax:270,  yMin:216, yMax:266}, // 10. Sigma
-  lens:   {xMin:290,  xMax:410,  yMin:216, yMax:266}, // 11. Lens
-  rex:    {xMin:430,  xMax:550,  yMin:216, yMax:266}, // 12. Rex
+  guard:  {xMin:14,   xMax:126,  yMin:153, yMax:193}, // 5. Guard  (margin+5)
+  coin:   {xMin:154,  xMax:266,  yMin:153, yMax:193}, // 6. Coin
+  lex:    {xMin:294,  xMax:406,  yMin:153, yMax:193}, // 7. Lex
+  people: {xMin:434,  xMax:546,  yMin:153, yMax:193}, // 8. People
+  pixel:  {xMin:14,   xMax:126,  yMin:221, yMax:261}, // 9. Pixel  (margin+5)
+  sigma:  {xMin:154,  xMax:266,  yMin:221, yMax:261}, // 10. Sigma
+  lens:   {xMin:294,  xMax:406,  yMin:221, yMax:261}, // 11. Lens
+  rex:    {xMin:434,  xMax:546,  yMin:221, yMax:261}, // 12. Rex
 };
 
 function inRoom(agentId, x, y) {
@@ -639,14 +639,14 @@ const DESK_POSITIONS = [
   {x:286, y:83},   // 2. Atlas
   {x:396, y:83},   // 3. Pulse
   {x:505, y:83},   // 4. Sage
-  {x: 70, y:172},  // 5. Guard
-  {x:210, y:172},  // 6. Coin
-  {x:350, y:172},  // 7. Lex
-  {x:490, y:172},  // 8. People
-  {x: 70, y:241},  // 9. Pixel
-  {x:210, y:241},  // 10. Sigma
-  {x:350, y:241},  // 11. Lens
-  {x:490, y:241},  // 12. Rex
+  {x: 70, y:175},  // 5. Guard   (ต่ำลงเพื่อ top clearance)
+  {x:210, y:175},  // 6. Coin
+  {x:350, y:175},  // 7. Lex
+  {x:490, y:175},  // 8. People
+  {x: 70, y:244},  // 9. Pixel
+  {x:210, y:244},  // 10. Sigma
+  {x:350, y:244},  // 11. Lens
+  {x:490, y:244},  // 12. Rex
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -1047,7 +1047,15 @@ function drawChar(w) {
   const spr = agentSprites[agent.id];
   if (spr) {
     // Square sprite 200×200 → display size
-    const dH = ps(36);   // ขนาดพอดีห้อง
+    // ขนาด sprite ตาม row ของ agent (Row 2/3 ห้องเล็กกว่า)
+    const agentRow = (() => {
+      const r = ROOM_BOUNDS[agent.id];
+      if (!r) return 1;
+      if (r.yMin < 130) return 1;   // Row 1 ห้องสูง
+      if (r.yMin < 210) return 2;   // Row 2 ห้องกลาง
+      return 3;                      // Row 3 ห้องล่าง
+    })();
+    const dH = agentRow === 1 ? ps(34) : ps(26); // Row1=34v, Row2/3=26v
     const dW = dH;
 
     const bob = moving ? (frame%2===0 ? -ps(1.5) : ps(0.5)) : 0;
@@ -1186,7 +1194,13 @@ function update(ts) {
     if(w.state==='return') {
       const dx=w.deskX-w.x, dy=w.deskY-w.y, dist=Math.sqrt(dx*dx+dy*dy), speed=0.08*dt;
       if(dist<speed+1) { w.x=w.deskX; w.y=w.deskY; w.state='sit'; w.sitTick=250+Math.random()*500; w.dir='down'; w.bubble=IDLE_LINES[Math.floor(Math.random()*IDLE_LINES.length)]; w.bubbleTick=2200; }
-      else { w.x+=(dx/dist)*speed; w.y+=(dy/dist)*speed; if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up'; }
+      else {
+        const nx=w.x+(dx/dist)*speed, ny=w.y+(dy/dist)*speed;
+        // clamp ด้วย — return ก็ห้ามออกนอกห้อง
+        if(inRoom(w.agent.id, nx, ny)) { w.x=nx; w.y=ny; }
+        else { w.x=w.deskX; w.y=w.deskY; w.state='sit'; w.sitTick=100; } // snap กลับถ้าหลุด
+        if(Math.abs(dx)>Math.abs(dy))w.dir=dx>0?'right':'left'; else w.dir=dy>0?'down':'up';
+      }
     }
   });
   // อัพเดต Boss ด้วย
