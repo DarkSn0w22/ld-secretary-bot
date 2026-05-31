@@ -156,24 +156,42 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 .dtag{display:inline-block;background:var(--bg);border:1px solid #273a58;border-radius:3px;
   padding:2px 6px;font-size:9px;color:var(--cyan);margin:2px;font-family:'Share Tech Mono';}
 
-/* ── Agents Page ── */
-.agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;
-  padding:16px;overflow-y:auto;align-content:start;}
-.ag-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;
-  position:relative;overflow:hidden;transition:.2s;}
-.ag-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.3);}
-.ag-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ac,var(--blue));}
-.ag-tier{position:absolute;top:8px;right:8px;font-size:8px;font-family:'Rajdhani',sans-serif;
-  font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:1px;}
-.tier-boss{background:#3a2a00;color:var(--yellow);border:1px solid #5a4a10;}
-.tier-legendary{background:#2a1040;color:var(--purple);border:1px solid #4a2060;}
-.tier-epic{background:#102030;color:var(--cyan);border:1px solid #204050;}
-.tier-rare{background:#0a2010;color:var(--green);border:1px solid #1a4020;}
-.tier-common{background:#1a1a20;color:var(--text2);border:1px solid var(--border);}
-.ag-em{font-size:32px;margin-bottom:6px;}
-.ag-name{font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;}
-.ag-role{font-size:10px;color:var(--text2);margin-top:2px;}
-.ag-tools{margin-top:8px;display:flex;flex-wrap:wrap;gap:3px;}
+/* ── Org Chart Page ── */
+.org-wrap{flex:1;overflow:auto;padding:24px 16px;background:var(--bg);}
+.org-title{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;
+  color:var(--text2);letter-spacing:2px;text-transform:uppercase;
+  text-align:center;margin-bottom:24px;}
+/* Tree layout */
+.org-tree,.org-tree ul{list-style:none;padding:0;margin:0;
+  display:flex;justify-content:center;position:relative;}
+.org-tree ul{margin-top:0;padding-top:20px;}
+.org-tree li{display:flex;flex-direction:column;align-items:center;
+  position:relative;padding:0 8px;}
+/* Vertical connector down from card */
+.org-tree li::after{content:'';position:absolute;top:0;left:50%;
+  width:1px;height:20px;background:var(--border2);}
+/* Horizontal + vertical connector from parent to first/last child */
+.org-tree ul::before{content:'';position:absolute;top:0;left:50%;
+  width:1px;height:20px;background:var(--border2);}
+.org-tree li+li::before{content:'';position:absolute;top:0;right:50%;
+  left:-8px;height:1px;background:var(--border2);}
+.org-tree > li::after{display:none;}
+/* Node card */
+.org-node{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:10px 14px;min-width:130px;max-width:180px;cursor:pointer;
+  position:relative;overflow:hidden;transition:.18s;text-align:center;
+  flex-shrink:0;}
+.org-node:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.4);}
+.org-node::before{content:'';position:absolute;top:0;left:0;right:0;
+  height:2px;background:var(--nc,#4f9eff);}
+.org-node.selected{border-color:var(--nc);box-shadow:0 0 0 1px var(--nc);}
+.org-em{font-size:22px;margin-bottom:4px;}
+.org-name{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--nc,#fff);}
+.org-role{font-size:8px;color:var(--text3);margin-top:1px;letter-spacing:.3px;}
+.org-dot{position:absolute;top:7px;right:7px;width:5px;height:5px;
+  border-radius:50%;background:var(--green);box-shadow:0 0 4px var(--green);}
+/* Connector override for single-child */
+.org-tree ul.single::before{display:none;}
 
 /* ── Console Page ── */
 .console-wrap{flex:1;display:flex;flex-direction:column;min-height:0;}
@@ -279,7 +297,10 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 
   <!-- PAGE: Agents -->
   <div class="page" id="pg-agents">
-    <div class="agents-grid" id="agents-grid"></div>
+    <div class="org-wrap">
+      <div class="org-title">🏢 OWNDAYS L&D AI — Organizational Chart</div>
+      <div id="org-chart"></div>
+    </div>
   </div>
 
   <!-- PAGE: Console -->
@@ -390,6 +411,7 @@ document.getElementById('nav').addEventListener('click', e => {
   document.getElementById(tab.dataset.page).classList.add('active');
   if (tab.dataset.page === 'pg-office') resizeCanvas();
   if (tab.dataset.page === 'pg-schedule') loadSchedule();
+  if (tab.dataset.page === 'pg-agents') buildOrgChart();
 });
 
 /* ═══════════════════════════════════════════════════
@@ -488,6 +510,8 @@ async function fetchAgentStatus() {
     const d = await r.json();
     agentStatus = d || {};
     updateStatusUI();
+    // Refresh org chart status dots if tab is active
+    if (document.getElementById('pg-agents')?.classList.contains('active')) buildOrgChart();
   } catch(e) {}
 }
 
@@ -604,23 +628,70 @@ document.getElementById('sched-save').addEventListener('click', async () => {
 });
 
 /* ═══════════════════════════════════════════════════
-   AGENTS GRID PAGE
+   ORG CHART PAGE
    ═══════════════════════════════════════════════════ */
-function buildAgentsGrid() {
-  const el = document.getElementById('agents-grid');
-  let h = '';
-  // Boss first
-  const tierCls = {BOSS:'tier-boss',LEGENDARY:'tier-legendary',EPIC:'tier-epic',RARE:'tier-rare',COMMON:'tier-common'};
-  [BOSS, ...AGENTS].forEach(a => {
-    const tier = TIERS[a.id] || 'COMMON';
-    h += `<div class="ag-card" style="--ac:${a.color}">
-      <div class="ag-tier ${tierCls[tier]}">${tier}</div>
-      <div class="ag-em">${a.em}</div>
-      <div class="ag-name" style="color:${a.color}">${a.name}</div>
-      <div class="ag-role">${a.role}</div>
-      <div class="ag-tools">${a.tools.map(t => `<span class="dtag">${t}</span>`).join('')}</div></div>`;
-  });
-  el.innerHTML = h;
+
+// Hierarchy: Boss → Rocket → [Atlas (team lead), Rex (retail)]
+//   Atlas subtree: Pulse, Sage, Guard, Coin, Lex, People
+//   Rex subtree:   Pixel, Sigma, Lens
+const ORG_HIERARCHY = {
+  id: 'peanut',
+  children: [{
+    id: 'rocket',
+    children: [
+      {
+        id: 'atlas',
+        children: [
+          {id:'pulse'}, {id:'sage'}, {id:'guard'},
+          {id:'coin'}, {id:'lex'}, {id:'people'},
+        ]
+      },
+      {
+        id: 'rex',
+        children: [
+          {id:'pixel'}, {id:'sigma'}, {id:'lens'},
+        ]
+      }
+    ]
+  }]
+};
+
+const ALL_AGENTS_MAP = {};
+[BOSS, ...AGENTS].forEach(a => { ALL_AGENTS_MAP[a.id] = a; });
+
+function orgCard(id) {
+  const a = ALL_AGENTS_MAP[id];
+  if (!a) return '';
+  const st = agentStatus[id];
+  const busy = st && st.status === 'busy';
+  return `<div class="org-node" style="--nc:${a.color}"
+    onclick="selectAgent('${id}');document.querySelectorAll('.ntab')[0].click();"
+    title="${a.role}">
+    <div class="org-dot" style="background:${busy?'var(--orange)':'var(--green)'};box-shadow:0 0 5px ${busy?'var(--orange)':'var(--green)'};"></div>
+    <div class="org-em">${a.em}</div>
+    <div class="org-name">${a.name}</div>
+    <div class="org-role">${a.role}</div>
+    ${busy && st.current_task ? `<div style="font-size:8px;color:var(--orange);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${st.current_task.slice(0,24)}...</div>` : ''}
+  </div>`;
+}
+
+function buildOrgTree(node) {
+  const children = node.children || [];
+  const isSingle = children.length === 1;
+  let h = `<li>${orgCard(node.id)}`;
+  if (children.length > 0) {
+    h += `<ul class="${isSingle?'single':''}">`;
+    children.forEach(c => { h += buildOrgTree(c); });
+    h += '</ul>';
+  }
+  h += '</li>';
+  return h;
+}
+
+function buildOrgChart() {
+  const el = document.getElementById('org-chart');
+  if (!el) return;
+  el.innerHTML = `<ul class="org-tree">${buildOrgTree(ORG_HIERARCHY)}</ul>`;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1467,7 +1538,7 @@ function animLoop(ts) {
 function init() {
   buildAgentList();
   buildSelectors();
-  buildAgentsGrid();
+  buildOrgChart();
   resizeCanvas();
   playBoot();
   // Start animation
