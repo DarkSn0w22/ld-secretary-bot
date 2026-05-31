@@ -528,6 +528,10 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
             <option value="th-TH">🇹🇭 Thai</option>
             <option value="en-US">🇺🇸 English</option>
           </select>
+          <!-- Voice selector — populated dynamically -->
+          <select id="jarvis-voice-sel" title="เลือกเสียง" style="background:rgba(0,30,60,.8);
+            border:1px solid #22d3ee33;color:#22d3ee88;padding:4px 8px;border-radius:4px;
+            font-size:9px;cursor:pointer;max-width:130px;"></select>
         </div>
         <!-- History -->
         <div id="jarvis-history"></div>
@@ -1884,43 +1888,54 @@ function startJarvisCanvas() {
     jarvisArcAngle += 0.008;
     const t = Date.now()/1000;
 
-    // Speech amplitude → ring pulse (ย่อ/ขยายตามเสียง)
-    if (jarvisSpeaking) {
-      // Smoothly increase power when speaking
-      jarvisSpeakPower = Math.min(1, jarvisSpeakPower + 0.05);
-    } else {
-      jarvisSpeakPower = Math.max(0, jarvisSpeakPower - 0.04);
+    // ── Speech power: ขยาย/หดวงแหวนตามเสียงพูด ──────────────
+    jarvisSpeakPower = jarvisSpeaking
+      ? Math.min(1, jarvisSpeakPower + 0.18)   // ramp up เร็ว
+      : Math.max(0, jarvisSpeakPower - 0.06);  // ramp down ช้า
+
+    // Dramatic pulse: +40% size + oscillation ±15% ที่ความถี่เสียงพูด (~3-5Hz)
+    const speakBeat = Math.sin(t * 22) * 0.5 + 0.5;  // 0-1 oscillation
+    const speakScale = 1 + jarvisSpeakPower * (0.35 + speakBeat * 0.15);
+    const speakGlow  = 1 + jarvisSpeakPower * 3.5;
+
+    // ── Sound wave rings ออกมาขณะพูด ──────────────────────────
+    if (jarvisSpeaking && jarvisSpeakPower > 0.4) {
+      const waveR = Math.min(W,H) * (0.15 + ((t*0.7)%0.35));
+      ctx.strokeStyle = `rgba(34,211,238,${0.6 - ((t*0.7)%0.35)*1.5})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, waveR, 0, Math.PI*2); ctx.stroke();
+      const waveR2 = Math.min(W,H) * (0.15 + ((t*0.7+0.17)%0.35));
+      ctx.strokeStyle = `rgba(34,211,238,${0.4 - ((t*0.7+0.17)%0.35)*1.1})`;
+      ctx.beginPath(); ctx.arc(cx, cy, waveR2, 0, Math.PI*2); ctx.stroke();
     }
-    // Oscillate ring size with speech: ± 8% of base radius
-    const speakScale = 1 + jarvisSpeakPower * (0.08 + Math.sin(t * 18) * 0.05);
-    const speakAlpha = 1 + jarvisSpeakPower * 1.5;  // brighter when speaking
 
     // Outer decorative rings
+    const baseR = Math.min(W,H);
     const rings = [
-      {r:Math.min(W,H)*0.42, lw:0.5, alpha:0.08, speed:0.3},
-      {r:Math.min(W,H)*0.38, lw:1,   alpha:0.12, speed:-0.5},
-      {r:Math.min(W,H)*0.33, lw:0.5, alpha:0.08, speed:0.7},
-      {r:Math.min(W,H)*0.28, lw:1.5, alpha:0.18, speed:-0.4},
-      {r:Math.min(W,H)*0.22, lw:0.5, alpha:0.10, speed:0.9},
+      {r:baseR*0.42, lw:0.5, alpha:0.08, speed:0.3},
+      {r:baseR*0.38, lw:1,   alpha:0.12, speed:-0.5},
+      {r:baseR*0.33, lw:0.5, alpha:0.08, speed:0.7},
+      {r:baseR*0.28, lw:1.5, alpha:0.18, speed:-0.4},
+      {r:baseR*0.22, lw:0.5, alpha:0.10, speed:0.9},
     ];
-    rings.forEach(({r,lw,alpha,speed}) => {
-      r *= speakScale;   // pulse size
-      alpha *= speakAlpha; // pulse brightness
+    rings.forEach(({r, lw, alpha, speed}) => {
+      const rr = r * speakScale;        // pulse size — dramatically bigger
+      const aa = alpha * speakGlow;     // pulse brightness
       ctx.save();
       ctx.translate(cx,cy);
       ctx.rotate(t*speed);
       // Dashed ring
-      ctx.strokeStyle = `rgba(34,211,238,${alpha})`;
-      ctx.lineWidth = lw;
-      ctx.setLineDash([Math.PI*r*0.08, Math.PI*r*0.04]);
-      ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle = `rgba(34,211,238,${Math.min(1, aa)})`;
+      ctx.lineWidth = lw * (1 + jarvisSpeakPower*0.5);
+      ctx.setLineDash([Math.PI*rr*0.08, Math.PI*rr*0.04]);
+      ctx.beginPath(); ctx.arc(0,0,rr,0,Math.PI*2); ctx.stroke();
       ctx.setLineDash([]);
       // Arc segments
       for(let i=0;i<6;i++) {
         const a = (Math.PI*2/6)*i;
-        ctx.strokeStyle = `rgba(34,211,238,${alpha*3})`;
+        ctx.strokeStyle = `rgba(34,211,238,${Math.min(1, aa*3)})`;
         ctx.lineWidth = lw*2;
-        ctx.beginPath(); ctx.arc(0,0,r,a,a+0.3); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0,0,rr,a,a+0.3); ctx.stroke();
       }
       ctx.restore();
     });
@@ -2057,37 +2072,54 @@ async function sendToRocket(text) {
 }
 
 // ── Speech Synthesis ─────────────────────────────────────────
+// Populate voice selector once voices are available
+function populateVoiceSelector() {
+  const sel = document.getElementById('jarvis-voice-sel');
+  if (!sel) return;
+  const voices = speechSynthesis.getVoices();
+  if (!voices.length) return;
+  sel.innerHTML = '<option value="">🔊 Auto (Male)</option>' +
+    voices.map((v,i) => `<option value="${i}">${v.name} (${v.lang})</option>`).join('');
+  console.log('[ROCKET voices]', voices.map(v => v.name + ' ' + v.lang));
+}
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = populateVoiceSelector;
+  setTimeout(populateVoiceSelector, 500);
+}
+
 function speakJarvis(text) {
   if (!window.speechSynthesis || !jarvisVoiceOn) return;
   window.speechSynthesis.cancel();
 
-  // ── เลือกเสียงผู้ชาย ──────────────────────────────────────
-  const lang = document.getElementById('jarvis-lang')?.value || 'th-TH';
   const voices = speechSynthesis.getVoices();
+  const lang = document.getElementById('jarvis-lang')?.value || 'th-TH';
 
-  // คำสำคัญที่บอกว่าเป็นเสียงผู้ชาย
-  const MALE_KEYWORDS = ['male','man','david','mark','daniel','james','thomas','alex','fred','eric'];
-  // หลีกเลี่ยงเสียงผู้หญิง
-  const FEMALE_KEYWORDS = ['female','woman','samantha','karen','victoria','kyoko','google thai female','ting-ting'];
+  // ── เลือกเสียง: manual selector ก่อน → auto male → fallback ──
+  let voice = null;
+  const manualIdx = document.getElementById('jarvis-voice-sel')?.value;
+  if (manualIdx && manualIdx !== '' && voices[parseInt(manualIdx)]) {
+    voice = voices[parseInt(manualIdx)];
+  } else {
+    // Auto-select male: ลำดับความสำคัญ
+    const MALE = ['google uk english male','daniel','tom','alex','fred','ralph','senior','reed','robbie','boulder','nicky','thomas','google us english','microsoft david','microsoft mark'];
+    const SKIP = ['female','samantha','karen','victoria','alice','anna','ioana','joana','kyoko','yuna','mei-jia','sin-ji','tingting','siri','google thai'];
+    const nameOk = v => {
+      const n = v.name.toLowerCase();
+      return !SKIP.some(k => n.includes(k));
+    };
+    voice =
+      voices.find(v => MALE.some(k => v.name.toLowerCase() === k)) ||
+      voices.find(v => MALE.some(k => v.name.toLowerCase().includes(k))) ||
+      voices.find(v => v.lang === 'en-GB' && nameOk(v)) ||
+      voices.find(v => v.lang.startsWith('en') && nameOk(v));
+  }
 
-  const isMale = v => {
-    const n = v.name.toLowerCase();
-    return MALE_KEYWORDS.some(k => n.includes(k)) && !FEMALE_KEYWORDS.some(k => n.includes(k));
-  };
-  const isNotFemale = v => !FEMALE_KEYWORDS.some(k => v.name.toLowerCase().includes(k));
+  console.log('[ROCKET TTS]', voice?.name || 'no voice', 'pitch:0.72');
 
-  let voice =
-    voices.find(v => v.lang.startsWith(lang.slice(0,2)) && isMale(v)) ||
-    voices.find(v => v.lang.startsWith(lang.slice(0,2)) && isNotFemale(v)) ||
-    voices.find(v => v.lang.startsWith('en') && isMale(v)) ||
-    voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('david')) ||
-    voices.find(v => v.lang.startsWith('en') && isNotFemale(v));
-
-  // ── แยกข้อความเป็นประโยคสั้น ๆ (ฟีลธรรมชาติกว่า) ──────────
-  const sentences = text.slice(0, 800)
-    .split(/[.!?।\n]+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
+  // ── แยกเป็นประโยค (ฟีลธรรมชาติ) ────────────────────────────
+  const sentences = text.slice(0,900)
+    .split(/(?<=[.!?ครับ])\s+|[\n]+/)
+    .map(s => s.trim()).filter(s => s.length > 1);
 
   let idx = 0;
   function speakNext() {
@@ -2098,23 +2130,18 @@ function speakJarvis(text) {
     }
     const utt = new SpeechSynthesisUtterance(sentences[idx++]);
     utt.lang = lang;
-    utt.rate = 0.92;   // ช้าลงนิด — ฟีลธรรมชาติ
-    utt.pitch = 0.75;  // ต่ำลง = เสียงผู้ชาย
-    utt.volume = 0.95;
+    utt.pitch  = 0.72;   // เสียงทุ้มแน่นอน — ไม่ว่าจะ voice ไหน
+    utt.rate   = 0.90;   // ช้าลงเล็กน้อย — ฟีลธรรมชาติ
+    utt.volume = 1.0;
     if (voice) utt.voice = voice;
-
-    utt.onstart = () => {
-      jarvisSpeaking = true;
-      jarvisSetStatus('SPEAKING');
-    };
-    utt.onend = () => speakNext();
+    utt.onstart = () => { jarvisSpeaking = true; jarvisSetStatus('SPEAKING'); };
+    utt.onend   = speakNext;
     utt.onerror = () => { jarvisSpeaking = false; jarvisSetStatus('STANDBY'); };
     window.speechSynthesis.speak(utt);
   }
 
-  // Ensure voices are loaded before speaking
-  if (voices.length === 0) {
-    window.speechSynthesis.onvoiceschanged = () => speakNext();
+  if (!voices.length) {
+    speechSynthesis.onvoiceschanged = () => { populateVoiceSelector(); speakNext(); };
   } else {
     speakNext();
   }
