@@ -857,6 +857,65 @@ def api_setup_richmenu():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/workflow-chain", methods=["POST"])
+def api_workflow_chain():
+    """
+    Manual trigger: Workflow Chain (Rex→Pulse→Lens→Action Plan)
+    Body: { branches: [...], sales_context: "...", issue_type: "...", priority: "high", force: false }
+    """
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+
+    data          = request.get_json(silent=True) or {}
+    branches      = data.get("branches", [])
+    sales_context = data.get("sales_context", "")
+    issue_type    = data.get("issue_type", "low performance")
+    priority      = data.get("priority", "high")
+    force         = bool(data.get("force", False))
+
+    if not branches:
+        return jsonify({"ok": False, "error": "กรุณาระบุ branches ครับ"}), 400
+
+    try:
+        from workflow_chains import run_branch_intervention_chain
+        log_agent("dashboard", "workflow", f"manual chain trigger: {branches[:3]}")
+
+        # รัน chain ใน background — return ทันที
+        import threading
+        threading.Thread(
+            target=run_branch_intervention_chain,
+            kwargs=dict(
+                branches=branches,
+                sales_context=sales_context,
+                issue_type=issue_type,
+                priority=priority,
+                user_id=PEANUT_USER_ID if hasattr(DASHBOARD_USER_ID, '__len__') else None,
+                force=force,
+            ),
+            daemon=True
+        ).start()
+
+        return jsonify({
+            "ok":      True,
+            "message": f"Chain เริ่มต้นแล้ว ({len(branches)} branches) — Action Plan จะถูกส่งไป LINE ครับ",
+            "branches": branches,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/workflow-history", methods=["GET"])
+def api_workflow_history():
+    """ดู history ของ workflow chains ที่รันไป"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from workflow_chains import get_chain_history
+        return jsonify({"history": get_chain_history()})
+    except Exception as e:
+        return jsonify({"history": [], "error": str(e)})
+
+
 _start_agent_bus()
 start_scheduler()
 start_autonomous_watchers()

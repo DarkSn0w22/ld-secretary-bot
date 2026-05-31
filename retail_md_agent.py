@@ -311,7 +311,7 @@ def _get_area_sales_benchmark(area: str) -> str:
 def _request_training_intervention(
     branches: list, issue_type: str, priority: str, details: str
 ) -> str:
-    """สร้าง training intervention request ส่งต่อ Pulse"""
+    """สร้าง training intervention request + trigger workflow chain อัตโนมัติ"""
     priority_th = {"urgent": "เร่งด่วนมาก", "high": "เร่งด่วน", "normal": "ปกติ"}.get(priority, priority)
     branch_list = "\n".join([f"  - {b}" for b in branches])
 
@@ -325,6 +325,21 @@ def _request_training_intervention(
         f"สำหรับสาขาข้างต้นโดยเร็วที่สุดครับ"
     )
     print(f"[Rex] Training Intervention Request ({priority}): {', '.join(branches)}")
+
+    # ── Auto-trigger workflow chain (urgent/high เท่านั้น) ─────────────────
+    if priority in ("urgent", "high") and branches:
+        try:
+            from workflow_chains import trigger_chain_background
+            trigger_chain_background(
+                branches     = branches,
+                sales_context= f"Rex intervention: {issue_type}. {details or ''}".strip(),
+                issue_type   = issue_type,
+                priority     = priority,
+            )
+            request_text += "\n\n🔗 Workflow Chain เริ่มต้นแล้วครับ (Pulse → Lens → Action Plan)"
+        except Exception as e:
+            print(f"[Rex] workflow chain trigger error: {e}")
+
     return request_text
 
 

@@ -346,6 +346,20 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
         </svg>
         Rich Menu
       </button>
+      <!-- Workflow Chain button -->
+      <button id="chain-btn" onclick="openChainModal()" title="Workflow Chain: Rex→Pulse→Lens→Action Plan"
+        style="display:flex;align-items:center;gap:5px;padding:5px 10px;
+               background:#1a2814;border:1px solid #2a5020;border-radius:5px;
+               color:#4ade80;font-size:10px;font-family:'Rajdhani',sans-serif;
+               font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;"
+        onmouseover="this.style.background='#203520';this.style.borderColor='#4ade80'"
+        onmouseout="this.style.background='#1a2814';this.style.borderColor='#2a5020'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/>
+          <line x1="8" y1="11" x2="16" y2="7"/><line x1="8" y1="13" x2="16" y2="17"/>
+        </svg>
+        Chain
+      </button>
     </div>
     <div><div id="clk">--:--:--</div><div id="datex">loading...</div></div>
   </div>
@@ -2314,6 +2328,178 @@ async function setupRichMenu() {
 }
 
 window.addEventListener('load', init);
+
+// ── Workflow Chain Modal ──────────────────────────────────────────────────────
+function openChainModal() {
+  let modal = document.getElementById('chain-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'chain-modal';
+    modal.style.cssText = `
+      position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.75);backdrop-filter:blur(4px);`;
+    modal.innerHTML = `
+      <div style="background:#0f1320;border:1px solid #1e3a60;border-radius:12px;
+                  padding:24px;width:480px;max-width:94vw;box-shadow:0 0 40px rgba(77,222,128,.12);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2">
+            <circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/>
+            <line x1="8" y1="11" x2="16" y2="7"/><line x1="8" y1="13" x2="16" y2="17"/>
+          </svg>
+          <span style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;
+                       color:#4ade80;letter-spacing:1px;">WORKFLOW CHAIN</span>
+          <span style="font-size:10px;color:#3a5070;margin-left:auto;">Rex → Pulse → Lens → Action Plan</span>
+        </div>
+
+        <div style="font-size:10px;color:#7088a8;background:#0a0e1a;border-radius:6px;
+                    padding:10px 12px;margin-bottom:14px;line-height:1.7;">
+          เมื่อกด Run: Rex ส่งข้อมูล → Pulse ตรวจ trainer gap → Lens เสนอ content<br>
+          → Rocket ส่ง Action Plan ไปยัง LINE ทันที (~30-60 วินาที)
+        </div>
+
+        <!-- Branches input -->
+        <div style="margin-bottom:12px;">
+          <label style="font-size:10px;color:#4ade80;font-family:'Rajdhani',sans-serif;
+                        font-weight:700;letter-spacing:1px;display:block;margin-bottom:5px;">
+            สาขาที่ต้องการ INTERVENTION
+          </label>
+          <textarea id="chain-branches" placeholder="กรอกชื่อสาขา คั่นด้วย comma หรือ newline&#10;เช่น: Central Eastville, Fashion Island, Seacon Square"
+            rows="3" style="width:100%;background:#0a0e1a;border:1px solid #1e3a60;border-radius:5px;
+                           padding:8px 10px;color:#c0d0e8;font-size:11px;font-family:'Share Tech Mono',monospace;
+                           resize:vertical;outline:none;"
+            onfocus="this.style.borderColor='#4ade80'" onblur="this.style.borderColor='#1e3a60'"></textarea>
+        </div>
+
+        <!-- Issue type + Priority row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:10px;color:#7088a8;font-family:'Rajdhani',sans-serif;
+                          letter-spacing:.5px;display:block;margin-bottom:4px;">ISSUE TYPE</label>
+            <select id="chain-issue" style="width:100%;background:#0a0e1a;border:1px solid #1e3a60;
+                           border-radius:5px;padding:6px 8px;color:#c0d0e8;font-size:11px;outline:none;">
+              <option value="low_achieve">Low Achievement %</option>
+              <option value="low_cvr">Low CVR %</option>
+              <option value="low_atv">Low ATV</option>
+              <option value="low_engager">Low Engager %</option>
+              <option value="new_staff">New Staff / Low OBT</option>
+              <option value="general">General Performance</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;color:#7088a8;font-family:'Rajdhani',sans-serif;
+                          letter-spacing:.5px;display:block;margin-bottom:4px;">PRIORITY</label>
+            <select id="chain-priority" style="width:100%;background:#0a0e1a;border:1px solid #1e3a60;
+                           border-radius:5px;padding:6px 8px;color:#c0d0e8;font-size:11px;outline:none;">
+              <option value="high">High ⚠️</option>
+              <option value="urgent">Urgent 🚨</option>
+              <option value="normal">Normal 📋</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Context -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:10px;color:#7088a8;font-family:'Rajdhani',sans-serif;
+                        letter-spacing:.5px;display:block;margin-bottom:4px;">SALES CONTEXT (optional)</label>
+          <input id="chain-context" type="text"
+            placeholder="เช่น: Achiev% 72%, CVR 15%, สัปดาห์ที่ 22"
+            style="width:100%;background:#0a0e1a;border:1px solid #1e3a60;border-radius:5px;
+                   padding:6px 10px;color:#c0d0e8;font-size:11px;outline:none;"
+            onfocus="this.style.borderColor='#4ade80'" onblur="this.style.borderColor='#1e3a60'">
+        </div>
+
+        <!-- History -->
+        <div id="chain-history-box" style="margin-bottom:14px;min-height:24px;"></div>
+
+        <!-- Buttons -->
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button onclick="document.getElementById('chain-modal').remove()"
+            style="padding:7px 16px;background:transparent;border:1px solid #2a3a5a;
+                   border-radius:5px;color:#7088a8;font-size:11px;cursor:pointer;">
+            ยกเลิก
+          </button>
+          <button id="chain-run-btn" onclick="runChain()"
+            style="padding:7px 18px;background:#1a3a20;border:1px solid #4ade80;
+                   border-radius:5px;color:#4ade80;font-size:11px;font-family:'Rajdhani',sans-serif;
+                   font-weight:700;cursor:pointer;letter-spacing:.5px;transition:.15s;"
+            onmouseover="this.style.background='#254a2a'" onmouseout="this.style.background='#1a3a20'">
+            ▶ RUN CHAIN
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    loadChainHistory();
+  }
+}
+
+async function loadChainHistory() {
+  try {
+    const r = await fetch('/api/workflow-history', {headers: AUTH_HEADERS});
+    const d = await r.json();
+    const box = document.getElementById('chain-history-box');
+    if (!box) return;
+    if (d.history && d.history.length > 0) {
+      box.innerHTML = `<div style="font-size:9px;color:#3a5070;margin-bottom:4px;">RECENT CHAINS</div>` +
+        d.history.slice(0,3).map(h =>
+          `<div style="font-size:9px;color:#4a6080;padding:2px 0;">
+            ⏱ ${h.ran_at} — ${h.key.replace('chain_','').replace(/_\d{8}$/,'').substring(0,40)}</div>`
+        ).join('');
+    }
+  } catch(e) {}
+}
+
+async function runChain() {
+  const branchRaw  = document.getElementById('chain-branches').value.trim();
+  const issueType  = document.getElementById('chain-issue').value;
+  const priority   = document.getElementById('chain-priority').value;
+  const context    = document.getElementById('chain-context').value.trim();
+
+  if (!branchRaw) {
+    alert('กรุณากรอกชื่อสาขาก่อนครับ'); return;
+  }
+
+  // parse branches (comma or newline separated)
+  const branches = branchRaw.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+  if (!branches.length) { alert('ไม่พบชื่อสาขาครับ'); return; }
+
+  const btn = document.getElementById('chain-run-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ กำลังรัน...';
+
+  try {
+    const r = await fetch('/api/workflow-chain', {
+      method: 'POST',
+      headers: {...AUTH_HEADERS, 'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        branches, issue_type: issueType, priority,
+        sales_context: context, force: false
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      btn.innerHTML = '✅ Chain เริ่มแล้ว!';
+      btn.style.color = '#3ddc84'; btn.style.borderColor = '#3ddc84';
+      // show success message in modal
+      const hist = document.getElementById('chain-history-box');
+      if (hist) hist.innerHTML =
+        `<div style="font-size:10px;color:#4ade80;padding:6px 10px;
+          background:#0d1e0d;border-radius:5px;border:1px solid #1a4020;">
+          ✅ ${d.message || 'Chain เริ่มต้นแล้วครับ'}<br>
+          <span style="color:#3a6040;font-size:9px;">Action Plan จะปรากฏใน LINE ภายใน 1-2 นาที</span>
+        </div>`;
+      setTimeout(() => {
+        document.getElementById('chain-modal')?.remove();
+      }, 4000);
+    } else {
+      alert('❌ ' + (d.error || 'ไม่ทราบสาเหตุ'));
+      btn.innerHTML = orig; btn.disabled = false;
+    }
+  } catch(e) {
+    alert('Network error: ' + e);
+    btn.innerHTML = orig; btn.disabled = false;
+  }
+}
 </script>
 </body>
 </html>
