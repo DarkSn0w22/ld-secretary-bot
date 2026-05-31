@@ -223,6 +223,49 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 .org-footer-legend{display:flex;align-items:center;gap:8px;}
 .org-footer-auto{margin-left:auto;display:flex;align-items:center;gap:6px;}
 
+/* ── JARVIS Page ── */
+#jarvis-wrap{flex:1;position:relative;overflow:hidden;background:#020810;display:flex;align-items:center;justify-content:center;}
+#jarvis-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s;}
+#jarvis-video.active{opacity:0.35;}
+#jarvis-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+#jarvis-ui{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;width:100%;height:100%;padding:20px;gap:12px;}
+#jarvis-header{text-align:center;margin-bottom:8px;}
+#jarvis-title{font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;
+  color:#22d3ee;letter-spacing:8px;text-shadow:0 0 20px #22d3ee,0 0 40px #22d3ee88;}
+#jarvis-subtitle{font-size:10px;color:#22d3ee66;letter-spacing:3px;margin-top:4px;}
+#jarvis-center{display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;}
+#jarvis-btn{
+  width:90px;height:90px;border-radius:50%;border:2px solid #22d3ee;
+  background:radial-gradient(circle at 50%,rgba(34,211,238,.15),rgba(0,10,30,.8));
+  color:#22d3ee;cursor:pointer;transition:.2s;display:flex;align-items:center;
+  justify-content:center;box-shadow:0 0 20px #22d3ee44,inset 0 0 20px #22d3ee22;
+  position:relative;z-index:2;}
+#jarvis-btn:hover{box-shadow:0 0 35px #22d3ee88,inset 0 0 30px #22d3ee44;transform:scale(1.05);}
+#jarvis-btn.listening{border-color:#ff6b6b;color:#ff6b6b;box-shadow:0 0 30px #ff6b6b88,inset 0 0 20px #ff6b6b33;
+  animation:pulse-red .8s infinite;}
+#jarvis-btn.processing{border-color:#ffd166;color:#ffd166;box-shadow:0 0 30px #ffd16688;
+  animation:spin-ring 1s linear infinite;}
+@keyframes pulse-red{0%,100%{box-shadow:0 0 20px #ff6b6b88}50%{box-shadow:0 0 50px #ff6b6bcc}}
+@keyframes spin-ring{to{filter:hue-rotate(360deg)}}
+#jarvis-status{font-family:'Share Tech Mono';font-size:11px;color:#22d3ee88;letter-spacing:3px;text-transform:uppercase;}
+#jarvis-transcript-wrap,#jarvis-response-wrap{
+  background:rgba(0,20,40,.7);border:1px solid #22d3ee22;border-radius:8px;
+  padding:10px 16px;max-width:620px;width:100%;text-align:center;}
+#jarvis-you-label,#jarvis-rocket-label{font-size:9px;color:#22d3ee66;letter-spacing:2px;margin-bottom:4px;}
+#jarvis-transcript{font-family:'Sarabun',sans-serif;font-size:15px;color:#a0d4ff;min-height:22px;}
+#jarvis-response{font-family:'Sarabun',sans-serif;font-size:13px;color:#c0e8ff;line-height:1.6;
+  min-height:22px;white-space:pre-wrap;max-height:120px;overflow-y:auto;}
+#jarvis-controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px;}
+#jarvis-controls button{background:rgba(0,30,60,.7);border:1px solid #22d3ee33;color:#22d3ee88;
+  padding:5px 12px;border-radius:4px;font-size:10px;cursor:pointer;transition:.15s;font-family:'Rajdhani',sans-serif;}
+#jarvis-controls button:hover,#jarvis-controls button.active{
+  background:rgba(34,211,238,.15);border-color:#22d3ee;color:#22d3ee;}
+#jarvis-history{max-width:620px;width:100%;max-height:100px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:4px;}
+.jarvis-hist{font-size:10px;color:#22d3ee44;font-family:'Share Tech Mono';padding:2px 8px;
+  border-left:1px solid #22d3ee22;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;}
+
 /* ── Console Page ── */
 .console-wrap{flex:1;display:flex;flex-direction:column;min-height:0;}
 .console-body{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:3px;background:var(--bg);}
@@ -297,6 +340,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   <div class="ntab" data-page="pg-agents">🤖 Agents</div>
   <div class="ntab" data-page="pg-console">💻 Console</div>
   <div class="ntab" data-page="pg-schedule">⏰ Schedule</div>
+  <div class="ntab" data-page="pg-jarvis" style="color:#22d3ee;" onclick="initJarvis()">🎙️ J.A.R.V.I.S</div>
 </div>
 
 <!-- ═══ PAGES ═══ -->
@@ -431,6 +475,62 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
       <div class="sched-actions" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
         <button class="cbtn" id="sched-save">💾 Save Schedule</button>
         <span id="sched-saved-msg" style="font-size:10px;color:var(--green);display:none;">✓ บันทึกแล้ว</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PAGE: JARVIS Voice Interface ═══ -->
+  <div class="page" id="pg-jarvis">
+    <div id="jarvis-wrap">
+      <!-- Camera feed (hidden until activated) -->
+      <video id="jarvis-video" autoplay muted playsinline></video>
+      <!-- Main canvas: arc reactor + HUD overlay -->
+      <canvas id="jarvis-canvas"></canvas>
+      <!-- UI overlay -->
+      <div id="jarvis-ui">
+        <div id="jarvis-header">
+          <div id="jarvis-title">J.A.R.V.I.S</div>
+          <div id="jarvis-subtitle">Just A Rather Very Intelligent System • OWNDAYS L&D</div>
+        </div>
+        <!-- Center button -->
+        <div id="jarvis-center">
+          <button id="jarvis-btn" onclick="toggleListening()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36">
+              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zm5.3 11.3a5.3 5.3 0 01-10.6 0H5a7 7 0 0013 1.4V12h-.7zm-5.3 7.7v3"/>
+              <path d="M12 20v3M9 23h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            </svg>
+          </button>
+          <div id="jarvis-status">STANDBY</div>
+        </div>
+        <!-- Transcript display -->
+        <div id="jarvis-transcript-wrap">
+          <div id="jarvis-you-label">YOU</div>
+          <div id="jarvis-transcript">—</div>
+        </div>
+        <!-- Rocket response -->
+        <div id="jarvis-response-wrap">
+          <div id="jarvis-rocket-label">🚀 ROCKET</div>
+          <div id="jarvis-response">กด microphone หรือพูดว่า "Hey Rocket" เพื่อเริ่มครับ</div>
+        </div>
+        <!-- Controls -->
+        <div id="jarvis-controls">
+          <button id="jarvis-cam-btn" onclick="toggleCamera()" title="Toggle Camera">
+            📷 Camera
+          </button>
+          <button id="jarvis-voice-btn" onclick="toggleVoiceOutput()" title="Toggle Voice Output">
+            🔊 Voice
+          </button>
+          <button id="jarvis-wake-btn" onclick="toggleWakeWord()" title="Wake Word: Hey Rocket">
+            👂 Wake Word
+          </button>
+          <select id="jarvis-lang" style="background:rgba(0,30,60,.8);border:1px solid #22d3ee33;
+            color:#22d3ee;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;">
+            <option value="th-TH">🇹🇭 Thai</option>
+            <option value="en-US">🇺🇸 English</option>
+          </select>
+        </div>
+        <!-- History -->
+        <div id="jarvis-history"></div>
       </div>
     </div>
   </div>
@@ -1744,6 +1844,305 @@ function toggleDetPanel() {
 })();
 
 window.addEventListener('resize', resizeCanvas);
+/* ═══════════════════════════════════════════════════
+   J.A.R.V.I.S — Voice Interface
+   ═══════════════════════════════════════════════════ */
+let jarvisInited = false;
+let jarvisListening = false;
+let jarvisVoiceOn = true;
+let jarvisWakeOn = false;
+let jarvisRecog = null;
+let jarvisStream = null;
+let jarvisAnimFrame = null;
+let jarvisAudioCtx = null;
+let jarvisAnalyser = null;
+let jarvisArcAngle = 0;
+
+function initJarvis() {
+  if (jarvisInited) return;
+  jarvisInited = true;
+  startJarvisCanvas();
+}
+
+// ── Arc Reactor + HUD Canvas ─────────────────────────────────
+function startJarvisCanvas() {
+  const cvs = document.getElementById('jarvis-canvas');
+  if (!cvs) return;
+  function resize() {
+    cvs.width = cvs.offsetWidth;
+    cvs.height = cvs.offsetHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  function draw() {
+    const ctx = cvs.getContext('2d');
+    const W = cvs.width, H = cvs.height;
+    const cx = W/2, cy = H/2;
+    ctx.clearRect(0,0,W,H);
+    jarvisArcAngle += 0.008;
+    const t = Date.now()/1000;
+
+    // Outer decorative rings
+    const rings = [
+      {r:Math.min(W,H)*0.42, lw:0.5, alpha:0.08, speed:0.3},
+      {r:Math.min(W,H)*0.38, lw:1,   alpha:0.12, speed:-0.5},
+      {r:Math.min(W,H)*0.33, lw:0.5, alpha:0.08, speed:0.7},
+      {r:Math.min(W,H)*0.28, lw:1.5, alpha:0.18, speed:-0.4},
+      {r:Math.min(W,H)*0.22, lw:0.5, alpha:0.10, speed:0.9},
+    ];
+    rings.forEach(({r,lw,alpha,speed}) => {
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.rotate(t*speed);
+      // Dashed ring
+      ctx.strokeStyle = `rgba(34,211,238,${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.setLineDash([Math.PI*r*0.08, Math.PI*r*0.04]);
+      ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      // Arc segments
+      for(let i=0;i<6;i++) {
+        const a = (Math.PI*2/6)*i;
+        ctx.strokeStyle = `rgba(34,211,238,${alpha*3})`;
+        ctx.lineWidth = lw*2;
+        ctx.beginPath(); ctx.arc(0,0,r,a,a+0.3); ctx.stroke();
+      }
+      ctx.restore();
+    });
+
+    // Pulsing center glow
+    const pulse = 0.5 + Math.sin(t*2)*0.3;
+    const grd = ctx.createRadialGradient(cx,cy,0,cx,cy,Math.min(W,H)*0.15);
+    grd.addColorStop(0, `rgba(34,211,238,${0.15*pulse})`);
+    grd.addColorStop(1, 'rgba(34,211,238,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(cx,cy,Math.min(W,H)*0.15,0,Math.PI*2); ctx.fill();
+
+    // Scanning line (horizontal)
+    const scanY = cy - Math.min(W,H)*0.35 + (Math.sin(t*0.5)+1)/2 * Math.min(W,H)*0.7;
+    const scanGrd = ctx.createLinearGradient(cx-Math.min(W,H)*0.4, 0, cx+Math.min(W,H)*0.4, 0);
+    scanGrd.addColorStop(0,'rgba(34,211,238,0)');
+    scanGrd.addColorStop(0.5,'rgba(34,211,238,0.06)');
+    scanGrd.addColorStop(1,'rgba(34,211,238,0)');
+    ctx.fillStyle = scanGrd;
+    ctx.fillRect(cx-Math.min(W,H)*0.4, scanY-1, Math.min(W,H)*0.8, 2);
+
+    // Corner HUD brackets
+    const bSize = 20, bX = W*0.08, bY = H*0.08;
+    ctx.strokeStyle = 'rgba(34,211,238,0.3)'; ctx.lineWidth = 1.5;
+    [[bX,bY],[W-bX,bY],[bX,H-bY],[W-bX,H-bY]].forEach(([x,y],i) => {
+      const sx = i%2===0 ? 1 : -1, sy = i<2 ? 1 : -1;
+      ctx.beginPath();
+      ctx.moveTo(x,y+sy*bSize); ctx.lineTo(x,y); ctx.lineTo(x+sx*bSize,y);
+      ctx.stroke();
+    });
+
+    // Data readouts top-left
+    ctx.font = '8px Share Tech Mono,monospace';
+    ctx.fillStyle = 'rgba(34,211,238,0.3)';
+    const now = new Date();
+    [`SYSTEM: ONLINE`, `TIME: ${now.toLocaleTimeString('en-GB')}`,
+     `AGENT: ROCKET`, `STATUS: ${jarvisListening?'LISTENING':'STANDBY'}`
+    ].forEach((txt,i) => ctx.fillText(txt, W*0.04, H*0.1+i*14));
+
+    // Audio waveform (if listening)
+    if (jarvisAnalyser && jarvisListening) {
+      const buf = new Uint8Array(jarvisAnalyser.frequencyBinCount);
+      jarvisAnalyser.getByteFrequencyData(buf);
+      const barW = Math.min(W,H)*0.6/buf.length*3;
+      const barX = cx - Math.min(W,H)*0.3;
+      ctx.fillStyle = 'rgba(255,107,107,0.6)';
+      for(let i=0;i<buf.length;i+=3) {
+        const bh = (buf[i]/255)*30;
+        ctx.fillRect(barX+i*barW, cy+Math.min(W,H)*0.38-bh, barW-0.5, bh);
+      }
+    }
+
+    jarvisAnimFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ── Voice Recognition ────────────────────────────────────────
+function toggleListening() {
+  if (jarvisListening) stopListening();
+  else startListening();
+}
+
+function startListening() {
+  const SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecog) {
+    jarvisSetResponse('Browser ไม่รองรับ SpeechRecognition ครับ (ใช้ Chrome)');
+    return;
+  }
+  // Start audio visualizer
+  startAudioViz();
+
+  jarvisRecog = new SpeechRecog();
+  jarvisRecog.lang = document.getElementById('jarvis-lang').value;
+  jarvisRecog.continuous = false;
+  jarvisRecog.interimResults = true;
+
+  jarvisRecog.onstart = () => {
+    jarvisListening = true;
+    jarvisSetStatus('LISTENING');
+    document.getElementById('jarvis-btn').classList.add('listening');
+    document.getElementById('jarvis-transcript').textContent = '...';
+  };
+  jarvisRecog.onresult = e => {
+    let interim = '', final = '';
+    for (const r of e.results) {
+      if (r.isFinal) final += r[0].transcript;
+      else interim += r[0].transcript;
+    }
+    document.getElementById('jarvis-transcript').textContent = final || interim || '...';
+    if (final) sendToRocket(final.trim());
+  };
+  jarvisRecog.onerror = e => {
+    jarvisSetStatus('ERROR: ' + e.error);
+    stopListening();
+  };
+  jarvisRecog.onend = () => stopListening();
+  jarvisRecog.start();
+}
+
+function stopListening() {
+  jarvisListening = false;
+  if (jarvisRecog) { try { jarvisRecog.stop(); } catch(e){} jarvisRecog = null; }
+  jarvisSetStatus('STANDBY');
+  document.getElementById('jarvis-btn').classList.remove('listening','processing');
+  stopAudioViz();
+}
+
+// ── Send to Rocket ────────────────────────────────────────────
+async function sendToRocket(text) {
+  if (!text) return;
+  jarvisSetStatus('PROCESSING');
+  document.getElementById('jarvis-btn').classList.remove('listening');
+  document.getElementById('jarvis-btn').classList.add('processing');
+  jarvisSetResponse('⚙️ Rocket กำลังคิด...');
+  addJarvisHistory('YOU', text);
+  try {
+    const r = await fetch('/api/agent', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', ...AUTH_HEADERS},
+      body: JSON.stringify({agent:'rocket', task: text})
+    });
+    const d = await r.json();
+    const reply = d.result || d.error || 'ไม่ได้รับคำตอบครับ';
+    jarvisSetResponse(reply);
+    addJarvisHistory('ROCKET', reply.slice(0,80) + (reply.length>80?'...':''));
+    if (jarvisVoiceOn) speakJarvis(reply);
+  } catch(e) {
+    jarvisSetResponse('❌ ระบบขัดข้องครับ: ' + e.message);
+  } finally {
+    jarvisSetStatus('STANDBY');
+    document.getElementById('jarvis-btn').classList.remove('processing');
+  }
+}
+
+// ── Speech Synthesis ─────────────────────────────────────────
+function speakJarvis(text) {
+  if (!window.speechSynthesis || !jarvisVoiceOn) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text.slice(0,500));
+  utt.lang = document.getElementById('jarvis-lang')?.value || 'th-TH';
+  utt.rate = 1.0; utt.pitch = 0.9; utt.volume = 0.9;
+  // Pick a good voice
+  const voices = speechSynthesis.getVoices();
+  const preferred = voices.find(v => v.lang.startsWith('th') && v.name.includes('Google'))
+    || voices.find(v => v.lang.startsWith('th'))
+    || voices.find(v => v.lang.startsWith('en') && v.name.includes('Google'));
+  if (preferred) utt.voice = preferred;
+  window.speechSynthesis.speak(utt);
+}
+
+// ── Camera ───────────────────────────────────────────────────
+async function toggleCamera() {
+  const btn = document.getElementById('jarvis-cam-btn');
+  const vid = document.getElementById('jarvis-video');
+  if (jarvisStream) {
+    jarvisStream.getTracks().forEach(t => t.stop());
+    jarvisStream = null;
+    vid.srcObject = null;
+    vid.classList.remove('active');
+    btn.classList.remove('active');
+  } else {
+    try {
+      jarvisStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+      vid.srcObject = jarvisStream;
+      vid.classList.add('active');
+      btn.classList.add('active');
+    } catch(e) {
+      alert('Camera error: ' + e.message);
+    }
+  }
+}
+
+// ── Voice Output toggle ───────────────────────────────────────
+function toggleVoiceOutput() {
+  jarvisVoiceOn = !jarvisVoiceOn;
+  document.getElementById('jarvis-voice-btn').classList.toggle('active', jarvisVoiceOn);
+  if (!jarvisVoiceOn) window.speechSynthesis?.cancel();
+}
+
+// ── Wake Word (Hey Rocket) ────────────────────────────────────
+let jarvisWakeRecog = null;
+function toggleWakeWord() {
+  jarvisWakeOn = !jarvisWakeOn;
+  document.getElementById('jarvis-wake-btn').classList.toggle('active', jarvisWakeOn);
+  if (jarvisWakeOn) startWakeWord();
+  else stopWakeWord();
+}
+function startWakeWord() {
+  const SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecog) return;
+  const rec = new SpeechRecog();
+  rec.lang = document.getElementById('jarvis-lang').value;
+  rec.continuous = true; rec.interimResults = false;
+  rec.onresult = e => {
+    const txt = e.results[e.results.length-1][0].transcript.toLowerCase();
+    if (txt.includes('hey rocket') || txt.includes('เฮ้ rocket') || txt.includes('rocket')) {
+      startListening();
+    }
+  };
+  rec.onend = () => { if(jarvisWakeOn) rec.start(); };
+  rec.start();
+  jarvisWakeRecog = rec;
+}
+function stopWakeWord() {
+  if (jarvisWakeRecog) { try{jarvisWakeRecog.stop();}catch(e){} jarvisWakeRecog = null; }
+}
+
+// ── Audio Visualizer ──────────────────────────────────────────
+async function startAudioViz() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    jarvisAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    jarvisAnalyser = jarvisAudioCtx.createAnalyser();
+    jarvisAnalyser.fftSize = 64;
+    const src = jarvisAudioCtx.createMediaStreamSource(stream);
+    src.connect(jarvisAnalyser);
+  } catch(e) {}
+}
+function stopAudioViz() {
+  if (jarvisAudioCtx) { jarvisAudioCtx.close(); jarvisAudioCtx = null; jarvisAnalyser = null; }
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function jarvisSetStatus(s) { const el=document.getElementById('jarvis-status'); if(el) el.textContent=s; }
+function jarvisSetResponse(t) { const el=document.getElementById('jarvis-response'); if(el) el.textContent=t; }
+function addJarvisHistory(who, txt) {
+  const h = document.getElementById('jarvis-history');
+  if (!h) return;
+  const d = document.createElement('div');
+  d.className = 'jarvis-hist';
+  d.textContent = `[${who}] ${txt}`;
+  h.appendChild(d);
+  h.scrollTop = h.scrollHeight;
+  if (h.children.length > 20) h.removeChild(h.firstChild);
+}
+
 window.addEventListener('load', init);
 </script>
 </body>
