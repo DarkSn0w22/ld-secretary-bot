@@ -113,7 +113,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 .cbtn:hover{filter:brightness(1.15);}
 
 /* ── Response / Chat ── */
-.rp{margin:0 10px 4px;background:var(--bg);border:1px solid #273a58;border-radius:4px;
+.rp{margin:0;background:var(--bg);border:1px solid #273a58;border-radius:4px;
   padding:6px 8px;font-size:10px;line-height:1.5;color:var(--text);max-height:60px;
   overflow-y:auto;white-space:pre-wrap;display:none;font-family:'Sarabun',sans-serif;}
 .chatlog{flex:1;overflow-y:auto;padding:4px 10px;background:var(--bg);display:flex;flex-direction:column;gap:2px;}
@@ -238,53 +238,40 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
       </div>
       <!-- Right: Stats + Command + Chat (resizable/collapsible) -->
       <div class="rpanel" id="rpanel">
-        <!-- Toggle hide button -->
-        <div class="ph" style="cursor:pointer;user-select:none;" onclick="toggleRPanel()">
-          Quick Stats
+        <!-- Toggle hide -->
+        <div class="ph" style="cursor:pointer;user-select:none;flex-shrink:0;" onclick="toggleRPanel()">
+          🚀 Command &amp; Chat
           <span id="rpanel-toggle" style="font-size:10px;color:var(--blue);margin-left:auto;">◀ hide</span>
         </div>
-        <div id="rpanel-body">
-          <div class="sgrid">
-            <div class="sb"><div class="sv" style="color:var(--blue)">400+</div><div class="sl">Employees</div></div>
-            <div class="sb"><div class="sv" style="color:var(--green)">18</div><div class="sl">Trainers</div></div>
-            <div class="sb"><div class="sv" style="color:var(--purple)">16</div><div class="sl">Courses</div></div>
-            <div class="sb"><div class="sv" style="color:var(--orange)">5</div><div class="sl">Areas</div></div>
+        <div id="rpanel-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+
+          <!-- Command section -->
+          <div style="flex-shrink:0;padding:8px;background:var(--panel2);border-bottom:1px solid var(--border);">
+            <div style="display:flex;gap:5px;margin-bottom:6px;align-items:center;">
+              <select class="csel" id="cmd-agent" style="flex-shrink:0;max-width:100px;"></select>
+              <input class="cinput" id="cmd-input" placeholder="พิมพ์คำสั่งให้ agent..." style="flex:1;">
+              <button class="cbtn" id="cmd-run">▶ RUN</button>
+            </div>
+            <!-- Response area — ขยายได้ -->
+            <div id="cmd-resp" class="rp" style="display:none;max-height:140px;margin:0;font-size:11px;line-height:1.6;font-family:'Sarabun',sans-serif;"></div>
           </div>
 
-          <!-- Command bar (moved from bottom) -->
-          <div class="ph" style="border-top:1px solid var(--border);">
-            💬 Command
-            <select class="csel" id="cmd-agent" style="margin-left:auto;max-width:90px;font-size:9px;padding:2px 4px;"></select>
-          </div>
-          <div style="padding:6px 8px;display:flex;gap:4px;background:var(--panel);">
-            <input class="cinput" id="cmd-input" placeholder="พิมพ์คำสั่ง..." style="font-size:10px;">
-            <button class="cbtn" id="cmd-run" style="padding:4px 10px;font-size:11px;">▶</button>
-          </div>
-          <div class="rp" id="cmd-resp" style="margin:0 8px 4px;max-height:55px;"></div>
-
-          <!-- Agent chat log -->
-          <div class="ph" style="border-top:1px solid var(--border);">
+          <!-- Agent Chat — flex:1 เต็มพื้นที่ที่เหลือ -->
+          <div class="ph" style="flex-shrink:0;">
             💬 Agent Chat
             <span id="chat-live" style="font-size:9px;color:var(--green);margin-left:auto;">● live</span>
           </div>
-          <div class="chatlog" id="chatlog" style="flex:1;min-height:120px;max-height:none;"></div>
+          <div class="chatlog" id="chatlog" style="flex:1;"></div>
 
-          <!-- Agent Detail (collapsible) -->
-          <div class="ph" style="border-top:1px solid var(--border);cursor:pointer;" onclick="toggleDetPanel()">
+          <!-- Agent Detail (collapsible, bottom) -->
+          <div class="ph" style="border-top:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="toggleDetPanel()">
             🤖 Agent Detail
             <span id="det-toggle" style="font-size:10px;color:var(--text2);margin-left:auto;">▼</span>
           </div>
-          <div class="det" id="det">
+          <div class="det" id="det" style="flex-shrink:0;max-height:180px;overflow-y:auto;">
             <div style="color:var(--text3);font-size:10px;text-align:center;padding:12px;">คลิก agent เพื่อดูรายละเอียด</div>
           </div>
 
-          <!-- Scheduled Jobs -->
-          <div class="ph" style="border-top:1px solid var(--border);">📅 Scheduled Jobs</div>
-          <div class="sched">
-            <div class="si"><span class="st">09:00</span><div><div class="sn">Morning Report</div><div class="sa">by Rocket</div></div><div class="sdot"></div></div>
-            <div class="si"><span class="st">12:00</span><div><div class="sn">KPI Check</div><div class="sa">by Sigma</div></div><div class="sdot"></div></div>
-            <div class="si"><span class="st">17:00</span><div><div class="sn">Daily Summary</div><div class="sa">by Sage</div></div><div class="sdot"></div></div>
-          </div>
         </div><!-- /rpanel-body -->
       </div>
     </div>
