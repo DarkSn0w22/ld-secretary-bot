@@ -787,9 +787,22 @@ def api_schedule_config_get():
     try:
         import json as _json
         with open(SCHEDULE_CONFIG_FILE, "r") as f:
-            return jsonify(_json.load(f))
+            cfg = _json.load(f)
     except Exception:
-        return jsonify(DEFAULT_SCHEDULE)
+        cfg = DEFAULT_SCHEDULE
+    # Inject actual running time from scheduler
+    try:
+        from scheduler import get_morning_hour_minute, get_morning_days
+        mh, mm = get_morning_hour_minute()
+        mdays = get_morning_days()
+        day_names = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+        cfg["_running"] = {
+            "time": f"{mh:02d}:{mm:02d}",
+            "days": [day_names[d] for d in mdays if d < 7],
+        }
+    except Exception:
+        pass
+    return jsonify(cfg)
 
 
 @app.route("/api/schedule-config", methods=["POST"])

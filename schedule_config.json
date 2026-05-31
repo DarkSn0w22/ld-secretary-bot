@@ -1,0 +1,11 @@
+{
+  "jobs": [
+    {
+      "time": "09:00",
+      "days": ["Mon","Tue","Wed","Thu","Fri"],
+      "agent": "Rocket",
+      "task": "Consolidated Morning Report (Coin + People + Sage)",
+      "enabled": true
+    }
+  ]
+}

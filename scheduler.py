@@ -5,6 +5,7 @@ Scheduler — Morning Report + Autonomous 4-hour Watch Cycle
 """
 
 import os
+import json
 import threading
 import time
 from datetime import datetime
@@ -20,10 +21,69 @@ PEANUT_USER_ID = os.getenv("PEANUT_USER_ID", "U668b7978706b2feaf61d071cc0080177"
 BANGKOK_TZ = pytz.timezone("Asia/Bangkok")
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
-# ส่งรายงาน 09:00 วันจันทร์-ศุกร์ ครั้งเดียว
-MORNING_HOUR   = 9
-MORNING_MINUTE = 0
-WORK_DAYS = [0, 1, 2, 3, 4]  # Mon-Fri
+SCHEDULE_CONFIG_FILE = "schedule_config.json"
+WORK_DAYS = [0, 1, 2, 3, 4]  # Mon-Fri fallback
+
+# ── Runtime config (reloaded every 5 min from schedule_config.json) ──────────
+_schedule_config = None
+_config_loaded_at = 0.0
+
+def load_schedule_config() -> dict:
+    """อ่าน schedule_config.json — ถ้าไม่มีใช้ default 09:00"""
+    global _schedule_config, _config_loaded_at
+    try:
+        with open(SCHEDULE_CONFIG_FILE, "r", encoding="utf-8") as f:
+            _schedule_config = json.load(f)
+            _config_loaded_at = time.time()
+            return _schedule_config
+    except Exception:
+        pass
+    # Default
+    _schedule_config = {
+        "jobs": [{
+            "time": "09:00",
+            "days": ["Mon","Tue","Wed","Thu","Fri"],
+            "agent": "Rocket",
+            "task": "Consolidated Morning Report (Coin + People + Sage)",
+            "enabled": True
+        }]
+    }
+    return _schedule_config
+
+def get_schedule_config() -> dict:
+    """คืน config ปัจจุบัน — reload ถ้าไฟล์เปลี่ยน (ทุก 5 นาที)"""
+    if _schedule_config is None or time.time() - _config_loaded_at > 300:
+        load_schedule_config()
+    return _schedule_config or {}
+
+def get_morning_job():
+    """ดึง job แรกที่ enabled จาก config"""
+    cfg = get_schedule_config()
+    for job in cfg.get("jobs", []):
+        if job.get("enabled", True):
+            return job
+    return None
+
+def get_morning_hour_minute():
+    """แยก HH:MM จาก job แรก"""
+    job = get_morning_job()
+    if job:
+        try:
+            hh, mm = job["time"].split(":")
+            return int(hh), int(mm)
+        except Exception:
+            pass
+    return 9, 0  # default
+
+DAY_MAP = {"Mon":0,"Tue":1,"Wed":2,"Thu":3,"Fri":4,"Sat":5,"Sun":6}
+
+def get_morning_days():
+    """คืน list ของ weekday integers จาก config"""
+    job = get_morning_job()
+    if job:
+        days = job.get("days", ["Mon","Tue","Wed","Thu","Fri"])
+        return [DAY_MAP[d] for d in days if d in DAY_MAP]
+    return WORK_DAYS
 
 
 def push_message(text: str) -> bool:
@@ -238,10 +298,12 @@ def scheduler_loop():
             sent_digest_hours = set()
             sent_watch_hours = set()
 
-        # ── Morning Report 09:00 จ-ศ ────────────────────────────
-        if (now.hour == MORNING_HOUR and
-                now.minute == MORNING_MINUTE and
-                weekday in WORK_DAYS and
+        # ── Morning Report — เวลาจาก schedule_config.json ──────────
+        mh, mm = get_morning_hour_minute()
+        mdays   = get_morning_days()
+        if (now.hour == mh and
+                now.minute == mm and
+                weekday in mdays and
                 sent_today != today):
             print("[Scheduler] Generating consolidated morning report...")
             try:

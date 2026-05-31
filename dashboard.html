@@ -298,14 +298,37 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   <!-- PAGE: Schedule -->
   <div class="page" id="pg-schedule">
     <div class="sched-wrap">
-      <div class="ph" style="margin-bottom:12px;">Schedule Configuration</div>
+      <!-- Running status banner -->
+      <div id="sched-running-banner" style="
+        background:var(--panel2);border:1px solid var(--border);border-radius:6px;
+        padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--green);
+          box-shadow:0 0 6px var(--green);animation:bk 2s infinite;flex-shrink:0;"></div>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:13px;color:var(--green);">
+            Scheduler Running
+          </div>
+          <div id="sched-running-info" style="font-size:10px;color:var(--text2);margin-top:2px;">
+            กำลังโหลด...
+          </div>
+        </div>
+        <button class="cbtn" onclick="loadSchedule()" style="margin-left:auto;padding:4px 10px;font-size:10px;background:var(--panel);">
+          🔄 Reload
+        </button>
+      </div>
+
+      <div class="ph" style="margin-bottom:8px;">⏰ Schedule Configuration
+        <span style="font-size:9px;color:var(--text3);font-weight:normal;margin-left:8px;">
+          บันทึกแล้วมีผลใน 5 นาที (scheduler reload อัตโนมัติ)
+        </span>
+      </div>
       <table class="sched-table" id="sched-table">
         <thead><tr><th>Time</th><th>Agent</th><th>Task</th><th>Days</th><th>Active</th></tr></thead>
         <tbody id="sched-tbody"></tbody>
       </table>
-      <div class="sched-actions">
-        <button class="cbtn" id="sched-save">Save Schedule</button>
-        <button class="cbtn" style="background:var(--panel);border:1px solid var(--border);color:var(--text2)" id="sched-reload">Reload</button>
+      <div class="sched-actions" style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+        <button class="cbtn" id="sched-save">💾 Save Schedule</button>
+        <span id="sched-saved-msg" style="font-size:10px;color:var(--green);display:none;">✓ บันทึกแล้ว</span>
       </div>
     </div>
   </div>
@@ -514,39 +537,71 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 /* ═══════════════════════════════════════════════════
    SCHEDULE PAGE
    ═══════════════════════════════════════════════════ */
+const ALL_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
 async function loadSchedule() {
   try {
     const r = await fetch('/api/schedule-config', {headers: AUTH_HEADERS});
     if (!r.ok) return;
     const d = await r.json();
+
+    // Show actual running schedule
+    const running = d._running;
+    const infoEl = document.getElementById('sched-running-info');
+    if (running && infoEl) {
+      infoEl.textContent = `กำลังรันจริง: ${running.time} น. ทุกวัน ${running.days.join(', ')}`;
+    }
+
     const tbody = document.getElementById('sched-tbody');
     tbody.innerHTML = '';
-    (d.jobs || d || []).forEach((j, i) => {
-      const opts = AGENTS.map(a => `<option value="${a.id}" ${a.id===j.agent?'selected':''}>${a.name}</option>`).join('');
+    (d.jobs || []).forEach((j, i) => {
+      const opts = AGENTS.map(a =>
+        `<option value="${a.id}" ${a.id===j.agent||a.name===j.agent?'selected':''}>${a.name}</option>`
+      ).join('');
+      // Day checkboxes
+      const days = Array.isArray(j.days) ? j.days : (j.days||'Mon,Tue,Wed,Thu,Fri').split(',').map(s=>s.trim());
+      const dayBoxes = ALL_DAYS.map(day =>
+        `<label style="font-size:9px;margin-right:3px;white-space:nowrap;">
+          <input type="checkbox" value="${day}" class="day-cb" data-i="${i}" ${days.includes(day)?'checked':''}> ${day}
+        </label>`
+      ).join('');
       tbody.innerHTML += `<tr>
-        <td><input type="time" value="${j.time||'09:00'}" data-i="${i}" data-f="time"></td>
-        <td><select data-i="${i}" data-f="agent">${opts}</select></td>
-        <td><input type="text" value="${esc(j.task||'')}" data-i="${i}" data-f="task" style="width:100%"></td>
-        <td><input type="text" value="${j.days||'Mon-Fri'}" data-i="${i}" data-f="days" style="width:80px"></td>
-        <td><input type="checkbox" ${j.active!==false?'checked':''} data-i="${i}" data-f="active"></td></tr>`;
+        <td><input type="time" value="${j.time||'09:00'}" data-i="${i}" data-f="time" style="width:90px;"></td>
+        <td><select data-i="${i}" data-f="agent" class="csel" style="width:80px;">${opts}</select></td>
+        <td><input type="text" value="${esc(j.task||'')}" data-i="${i}" data-f="task" class="cinput" style="width:100%;font-size:10px;"></td>
+        <td style="min-width:200px;">${dayBoxes}</td>
+        <td><input type="checkbox" ${j.enabled!==false?'checked':''} data-i="${i}" data-f="enabled"></td>
+      </tr>`;
     });
-  } catch(e) {}
+  } catch(e) { console.error('loadSchedule error:', e); }
 }
 
 document.getElementById('sched-save').addEventListener('click', async () => {
   const rows = document.querySelectorAll('#sched-tbody tr');
-  const jobs = Array.from(rows).map((_, i) => ({
-    time: document.querySelector(`[data-i="${i}"][data-f="time"]`)?.value || '09:00',
-    agent: document.querySelector(`[data-i="${i}"][data-f="agent"]`)?.value || 'rocket',
-    task: document.querySelector(`[data-i="${i}"][data-f="task"]`)?.value || '',
-    days: document.querySelector(`[data-i="${i}"][data-f="days"]`)?.value || 'Mon-Fri',
-    active: document.querySelector(`[data-i="${i}"][data-f="active"]`)?.checked ?? true,
-  }));
+  const jobs = Array.from(rows).map((_, i) => {
+    const days = Array.from(document.querySelectorAll(`.day-cb[data-i="${i}"]:checked`))
+      .map(cb => cb.value);
+    return {
+      time:    document.querySelector(`[data-i="${i}"][data-f="time"]`)?.value || '09:00',
+      agent:   document.querySelector(`[data-i="${i}"][data-f="agent"]`)?.value || 'rocket',
+      task:    document.querySelector(`[data-i="${i}"][data-f="task"]`)?.value || '',
+      days:    days.length ? days : ['Mon','Tue','Wed','Thu','Fri'],
+      enabled: document.querySelector(`[data-i="${i}"][data-f="enabled"]`)?.checked ?? true,
+    };
+  });
   try {
-    await fetch('/api/schedule-config', {method:'POST', headers:{'Content-Type':'application/json',...AUTH_HEADERS}, body:JSON.stringify({jobs})});
+    const res = await fetch('/api/schedule-config', {
+      method:'POST',
+      headers:{'Content-Type':'application/json',...AUTH_HEADERS},
+      body: JSON.stringify({jobs})
+    });
+    if (res.ok) {
+      const msg = document.getElementById('sched-saved-msg');
+      if (msg) { msg.style.display='inline'; setTimeout(()=>msg.style.display='none', 3000); }
+      await loadSchedule();  // reload to show updated running info
+    }
   } catch(e) {}
 });
-document.getElementById('sched-reload').addEventListener('click', loadSchedule);
 
 /* ═══════════════════════════════════════════════════
    AGENTS GRID PAGE
