@@ -916,6 +916,34 @@ def api_workflow_history():
         return jsonify({"history": [], "error": str(e)})
 
 
+@app.route("/api/memory-trends", methods=["GET"])
+def api_memory_trends():
+    """ดู KPI trend summary จาก historical memory"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from historical_memory import get_dashboard_trends, get_summary_text
+        trends = get_dashboard_trends()
+        summary = get_summary_text()
+        return jsonify({"trends": trends, "summary": summary})
+    except Exception as e:
+        return jsonify({"trends": {}, "summary": "", "error": str(e)})
+
+
+@app.route("/api/memory-history", methods=["GET"])
+def api_memory_history():
+    """ดู raw history ของ metric หนึ่งตัว — ?metric=survey.overall_avg&n=10"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    metric = request.args.get("metric", "survey.overall_avg")
+    n      = request.args.get("n", 10, type=int)
+    try:
+        from historical_memory import get_history
+        return jsonify({"metric": metric, "history": get_history(metric, n=n)})
+    except Exception as e:
+        return jsonify({"metric": metric, "history": [], "error": str(e)})
+
+
 _start_agent_bus()
 start_scheduler()
 start_autonomous_watchers()

@@ -236,6 +236,17 @@ def coin_watch() -> dict:
         except Exception:
             pass
 
+        # ── Historical snapshot ──────────────────────────────────
+        try:
+            from historical_memory import record_snapshot
+            record_snapshot("coin", {
+                "cost.actual":     actual,
+                "cost.budget":     budget,
+                "cost.usage_pct":  usage_pct,
+            })
+        except Exception:
+            pass
+
         ideas = [
             "พิจารณาจัดทำ forecast รายเดือนเพื่อควบคุมงบ",
             "เปรียบเทียบ ROI ระหว่าง training format (online vs onsite)",
@@ -311,6 +322,17 @@ def pulse_watch() -> dict:
                 score = float(t.get("avg_score", t.get("score", 9)))
                 if score < 9:  # valid score (not default 9)
                     alert_survey_low(t.get("name","?"), score)
+        except Exception:
+            pass
+
+        # ── Historical snapshot ──────────────────────────────────
+        try:
+            from historical_memory import record_snapshot
+            record_snapshot("pulse", {
+                "survey.overall_avg":     survey_data.get("overall_avg", 0),
+                "survey.total_responses": survey_data.get("total_responses", 0),
+                "survey.low_trainer_count": len(low_trainers),
+            })
         except Exception:
             pass
 
@@ -443,6 +465,24 @@ def people_watch() -> dict:
         except Exception:
             pass
 
+        # ── Historical snapshot ──────────────────────────────────
+        try:
+            from historical_memory import record_snapshot
+            total_staff = sum(
+                info.get("employee_summary", {}).get("total", 0)
+                for info in area_data.get("areas", {}).values()
+            ) if area_data.get("areas") else 0
+            total_prob = sum(
+                int(a[1]) for a in alerts
+                if "probation" in a[0].lower()
+            ) if alerts else 0
+            record_snapshot("people", {
+                "hr.total_staff":      total_staff,
+                "hr.probation_count":  total_prob,
+            })
+        except Exception:
+            pass
+
         ideas = [
             "จัดทำ probation tracker แบบ real-time บน dashboard",
             "สร้าง onboarding checklist ดิจิทัลสำหรับพนักงานใหม่",
@@ -572,6 +612,19 @@ BLOG POSTS ล่าสุด:
         except Exception:
             pass
 
+        # ── Historical snapshot ──────────────────────────────────
+        try:
+            from historical_memory import record_snapshot
+            is_up = 1 if uptime.get("status") in ("up","ok","200") else 0
+            record_snapshot("pixel", {
+                "website.is_up":       is_up,
+                "website.latency_ms":  uptime.get("latency_ms", 0) or 0,
+                "website.sessions_7d": overview.get("sessions", 0) or 0,
+                "website.bounce_rate": overview.get("bounce_rate_pct", 0) or 0,
+            })
+        except Exception:
+            pass
+
         log_agent("pixel", "rocket",
                   "analytics report พร้อมส่ง",
                   f"sessions={overview.get('sessions',0)}, "
@@ -591,13 +644,36 @@ BLOG POSTS ล่าสุด:
 
 
 def sigma_watch() -> dict:
-    """Sigma — Data Analyst proactive watch"""
+    """Sigma — Data Analyst proactive watch (ใช้ historical memory เพื่อ trend analysis)"""
     try:
         log_agent("scheduler", "sigma", "[watch] autonomous data analysis")
 
         survey_data = fetch_dashboard("survey")
         oar_data_raw = fetch_dashboard("oar")
         cost_data = fetch_dashboard("cost")
+
+        # ── บันทึก snapshot ลง historical memory ──────────────────
+        try:
+            from historical_memory import record_snapshot
+            actual = cost_data.get("actual", 0)
+            budget = cost_data.get("budget", 1) or 1
+            record_snapshot("sigma", {
+                "survey.overall_avg":     survey_data.get("overall_avg", 0),
+                "survey.total_responses": survey_data.get("total_responses", 0),
+                "oar.total":              oar_data_raw.get("total", 0),
+                "cost.actual":            actual,
+                "cost.usage_pct":         actual / budget * 100,
+            })
+        except Exception as snap_err:
+            print(f"[Sigma] snapshot error: {snap_err}")
+
+        # ── ดึง historical context ─────────────────────────────────
+        historical_context = ""
+        try:
+            from historical_memory import get_sigma_context
+            historical_context = get_sigma_context()
+        except Exception:
+            pass
 
         # ตรวจ statistical anomalies
         trainers = survey_data.get("trainers", [])
@@ -615,6 +691,7 @@ def sigma_watch() -> dict:
         system = (
             "คุณคือ Sigma Data scientist ที่วิเคราะห์ retail L&D data มา 7 ปี "
             "มองหา pattern ที่ซ่อนอยู่ในข้อมูล cross-reference ข้าม dataset "
+            "มี historical memory — ใช้ trend data เพื่อวิเคราะห์ว่ากำลังดีขึ้นหรือแย่ลง "
             "นำเสนอ insight ที่ manager ไม่เคยเห็นมาก่อน "
             "ตอบ plain text ไม่ใช้ Markdown ลงท้ายครับ"
         )
@@ -622,22 +699,25 @@ def sigma_watch() -> dict:
             f"\nStatistical anomalies พบ:\n" + "\n".join(anomalies)
             if anomalies else "\nไม่พบ anomaly ที่ชัดเจน"
         )
+        hist_block = f"\n{historical_context}\n" if historical_context else ""
         user_content = (
             f"ข้อมูล Survey: overall_avg={overall_avg:.2f}, "
             f"total_responses={survey_data.get('total_responses',0)}\n"
             f"ข้อมูล OAR: total={oar_data_raw.get('total',0)}\n"
             f"ข้อมูล Cost: actual={cost_data.get('actual',0):,.0f}, "
             f"budget={cost_data.get('budget',0):,.0f}\n"
-            f"{anomaly_block}\n\n"
+            f"{anomaly_block}"
+            f"{hist_block}\n"
             "วิเคราะห์เชิงลึก:\n"
             "1. Pattern ที่น่าสนใจจากการ cross-reference ข้อมูล\n"
-            "2. Anomaly ที่ควรติดตาม\n"
-            "3. Insight เชิง data-driven ที่ actionable\n"
-            "สรุปกระชับ ไม่เกิน 400 ตัวอักษร ลงท้ายครับ"
+            "2. Trend เปรียบเทียบกับ historical data (ดีขึ้น/แย่ลง?)\n"
+            "3. Anomaly ที่ควรติดตาม\n"
+            "4. Insight เชิง data-driven ที่ actionable\n"
+            "สรุปกระชับ ไม่เกิน 450 ตัวอักษร ลงท้ายครับ"
         )
-        summary = _ask_claude("sigma", system, user_content)
+        summary = _ask_claude("sigma", system, user_content, max_tokens=900)
 
-        alerts = [a for a in anomalies[:3]]  # แจ้งเฉพาะ anomaly จริง
+        alerts = [a for a in anomalies[:3]]
 
         ideas = [
             "สร้าง correlation model ระหว่าง OAR completion และ survey score",
