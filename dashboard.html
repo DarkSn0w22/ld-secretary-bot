@@ -640,86 +640,206 @@ function initSprites() {
 }
 
 // ── Draw helpers ──
+
 function drawFloor(rm) {
-  // Dark floor with subtle grid
-  ctx.fillStyle = '#0c1220';
-  // Dark blue-gray floor like reference
-  ctx.fillStyle = '#1a2030';
-  ctx.fillRect(rm.x+2, rm.y+2, rm.w-4, rm.h-4);
-  // Tile grid
-  ctx.strokeStyle = '#1e2840'; ctx.lineWidth = 0.5;
-  const gs = 14;
-  for (let gx=rm.x+2; gx<rm.x+rm.w-2; gx+=gs) { ctx.beginPath(); ctx.moveTo(gx,rm.y+2); ctx.lineTo(gx,rm.y+rm.h-2); ctx.stroke(); }
-  for (let gy=rm.y+2; gy<rm.y+rm.h-2; gy+=gs) { ctx.beginPath(); ctx.moveTo(rm.x+2,gy); ctx.lineTo(rm.x+rm.w-2,gy); ctx.stroke(); }
-  // Thick wall border
-  ctx.fillStyle = '#2e3a4a';
-  ctx.fillRect(rm.x, rm.y, rm.w, 3); ctx.fillRect(rm.x, rm.y, 3, rm.h);
-  ctx.fillRect(rm.x+rm.w-3, rm.y, 3, rm.h); ctx.fillRect(rm.x, rm.y+rm.h-3, rm.w, 3);
-  // Colored nameplate strip (like reference)
+  // Room wall border (medium gray)
+  ctx.fillStyle = '#2e3848';
+  ctx.fillRect(rm.x, rm.y, rm.w, rm.h);
+  // Inner floor (dark blue-slate)
+  const wt = 3; // wall thickness
+  ctx.fillStyle = '#1c2235';
+  ctx.fillRect(rm.x + wt, rm.y + wt, rm.w - wt*2, rm.h - wt*2);
+  // Subtle tile grid
+  ctx.strokeStyle = '#1a2030';
+  ctx.lineWidth = 0.5;
+  const gs = 16;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rm.x + wt, rm.y + wt, rm.w - wt*2, rm.h - wt*2);
+  ctx.clip();
+  for (let gx = rm.x + wt; gx <= rm.x + rm.w - wt; gx += gs) {
+    ctx.beginPath(); ctx.moveTo(gx, rm.y + wt); ctx.lineTo(gx, rm.y + rm.h - wt); ctx.stroke();
+  }
+  for (let gy = rm.y + wt; gy <= rm.y + rm.h - wt; gy += gs) {
+    ctx.beginPath(); ctx.moveTo(rm.x + wt, gy); ctx.lineTo(rm.x + rm.w - wt, gy); ctx.stroke();
+  }
+  ctx.restore();
+  // Nameplate strip at top of room
   if (rm.agent) {
-    ctx.fillStyle = rm.agent.color + '28';
-    ctx.fillRect(rm.x+3, rm.y+3, rm.w-6, 15);
+    const npH = 18;
+    const npY = rm.y + wt;
+    // Colored semi-transparent background
+    ctx.globalAlpha = 0.22;
     ctx.fillStyle = rm.agent.color;
-    ctx.fillRect(rm.x+3, rm.y+3, 3, 15);
-    ctx.font = `bold 7px 'Rajdhani',sans-serif`;
+    ctx.fillRect(rm.x + wt, npY, rm.w - wt*2, npH);
+    ctx.globalAlpha = 1;
+    // Left accent bar
     ctx.fillStyle = rm.agent.color;
-    ctx.fillText(rm.agent.em + ' ' + rm.agent.name, rm.x+9, rm.y+12);
-    ctx.font = `6px 'Share Tech Mono',monospace`;
-    ctx.fillStyle = '#4a6a88';
-    ctx.fillText(rm.agent.role, rm.x+9, rm.y+20);
+    ctx.fillRect(rm.x + wt, npY, 3, npH);
+    // Bottom separator line
+    ctx.strokeStyle = rm.agent.color + '55';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(rm.x + wt, npY + npH);
+    ctx.lineTo(rm.x + rm.w - wt, npY + npH);
+    ctx.stroke();
+    // Emoji + Name
+    ctx.font = `bold 8px 'Rajdhani', sans-serif`;
+    ctx.fillStyle = rm.agent.color;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(rm.agent.em + '  ' + rm.agent.name, rm.x + wt + 6, npY + 7);
+    // Role (smaller)
+    ctx.font = `6px 'Share Tech Mono', monospace`;
+    ctx.fillStyle = '#6a8aaa';
+    ctx.fillText(rm.agent.role, rm.x + wt + 6, npY + 14);
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
   }
 }
 
 function drawDesk(cx, cy, w) {
-  const dw = Math.min(w*0.55, 60), dh = 12;
-  // Chair behind desk
-  ctx.fillStyle = '#14141e'; ctx.fillRect(cx-6, cy+dh/2+2, 12, 7);
-  ctx.fillStyle = '#1e1e2e'; ctx.fillRect(cx-7, cy+dh/2, 14, 4);
-  // Desk body (brown wood)
-  ctx.fillStyle = '#2a1a10'; ctx.fillRect(cx-dw/2, cy-dh/2, dw, dh);
-  ctx.fillStyle = '#3a2418'; ctx.fillRect(cx-dw/2, cy-dh/2, dw, 4); // top
-  ctx.fillStyle = '#1a0e08'; ctx.fillRect(cx-dw/2, cy+dh/2-3, dw, 3); // front
-  // Dual monitors
-  const mon = (mx, glow) => {
-    ctx.fillStyle='#0e1620'; ctx.fillRect(mx-6,cy-dh/2-11,12,9);
-    ctx.fillStyle=glow; ctx.fillRect(mx-5,cy-dh/2-10,10,7);
-    for(let i=0;i<3;i++){ctx.fillStyle='rgba(100,180,255,0.3)';ctx.fillRect(mx-4,cy-dh/2-9+i*2,8,1);}
-    ctx.fillStyle='#222'; ctx.fillRect(mx-1,cy-dh/2-2,3,2);
-  };
-  if (dw>40) { mon(cx-dw/4,'#1a4060'); mon(cx+dw/4,'#0e2840'); }
-  else        { mon(cx,'#1a3a58'); }
+  const dw = Math.min(w * 0.62, 72);
+  const dh = 13;
+  const x0 = cx - dw / 2;
+  const y0 = cy - dh / 2;
+
+  // Chair (behind desk, lower z-order)
+  ctx.fillStyle = '#0e0e18';
+  ctx.fillRect(cx - 7, y0 + dh + 2, 14, 8);   // seat
+  ctx.fillStyle = '#1a1a28';
+  ctx.fillRect(cx - 8, y0 + dh, 16, 4);         // seat cushion
+  ctx.fillStyle = '#0e0e18';
+  ctx.fillRect(cx - 7, y0 + dh - 4, 14, 4);     // back rest
+
+  // Desk legs (dark)
+  ctx.fillStyle = '#220f06';
+  ctx.fillRect(x0 + 2, y0 + dh, 4, 5);
+  ctx.fillRect(x0 + dw - 6, y0 + dh, 4, 5);
+
+  // Desk body
+  ctx.fillStyle = '#3d2415'; // dark wood
+  ctx.fillRect(x0, y0, dw, dh);
+  // Desk top surface highlight
+  ctx.fillStyle = '#5a3420';
+  ctx.fillRect(x0, y0, dw, 4);
+  // Top edge highlight (bright)
+  ctx.fillStyle = '#6b3e28';
+  ctx.fillRect(x0, y0, dw, 1);
+  // Front face (darker)
+  ctx.fillStyle = '#2c1a0e';
+  ctx.fillRect(x0, y0 + dh - 4, dw, 4);
+
   // Keyboard
-  ctx.fillStyle='#1e2030'; ctx.fillRect(cx-dw/2+4, cy-dh/2+5, dw-8, 4);
+  ctx.fillStyle = '#181822';
+  ctx.fillRect(x0 + 4, y0 + 5, dw - 8, 5);
+  ctx.fillStyle = '#22223a';
+  ctx.fillRect(x0 + 5, y0 + 5, dw - 10, 2);
+
+  // Monitors
+  const monW = 13, monH = 10;
+  const drawMonitor = (mx) => {
+    // Stand
+    ctx.fillStyle = '#0e1218';
+    ctx.fillRect(mx - 1, y0 - 3, 3, 4);
+    ctx.fillRect(mx - 3, y0 - 2, 7, 2);
+    // Frame
+    ctx.fillStyle = '#0e1520';
+    ctx.fillRect(mx - monW/2 - 1, y0 - monH - 3, monW + 2, monH + 2);
+    // Screen (blue glow)
+    ctx.fillStyle = '#163050';
+    ctx.fillRect(mx - monW/2, y0 - monH - 2, monW, monH);
+    // Screen glow lines
+    for (let li = 0; li < 4; li++) {
+      ctx.fillStyle = `rgba(80,160,255,${0.08 + li * 0.04})`;
+      ctx.fillRect(mx - monW/2 + 1, y0 - monH - 2 + li * 2 + 1, monW - 2, 1);
+    }
+    // Screen reflection
+    ctx.fillStyle = 'rgba(200,230,255,0.06)';
+    ctx.fillRect(mx - monW/2, y0 - monH - 2, monW/3, monH/2);
+  };
+
+  if (dw > 46) {
+    drawMonitor(cx - dw * 0.22);
+    drawMonitor(cx + dw * 0.22);
+  } else {
+    drawMonitor(cx);
+  }
 }
 
 function drawChair(cx, cy) {
-  // already drawn inside drawDesk
+  // Chair is drawn inside drawDesk — keep empty for compatibility
 }
 
-function drawPlant(x, y) {
-  // Pot
-  ctx.fillStyle = '#4a3020';
-  ctx.fillRect(x - 4, y, 8, 7);
-  // Leaves
-  ctx.fillStyle = '#1a6a2a';
-  ctx.beginPath(); ctx.arc(x, y - 2, 6, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#2a8a3a';
-  ctx.beginPath(); ctx.arc(x - 3, y - 4, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 3, y - 5, 3.5, 0, Math.PI * 2); ctx.fill();
+function drawPlant(x, y, size) {
+  size = size || 1;
+  const s = size;
+  // Pot body
+  ctx.fillStyle = '#5c3a20';
+  ctx.fillRect(x - 4*s, y, 8*s, 7*s);
+  // Pot highlight
+  ctx.fillStyle = '#7a4e2a';
+  ctx.fillRect(x - 4*s, y, 8*s, 2*s);
+  // Pot rim
+  ctx.fillStyle = '#4a2e16';
+  ctx.fillRect(x - 5*s, y - 1*s, 10*s, 2*s);
+  // Soil
+  ctx.fillStyle = '#2a1a0c';
+  ctx.fillRect(x - 4*s, y + 2*s, 8*s, 2*s);
+
+  // Main foliage clusters
+  const leaves = [
+    [x, y - 8*s, 7*s, '#1a5c28'],
+    [x - 5*s, y - 6*s, 5*s, '#1e6e30'],
+    [x + 4*s, y - 7*s, 5*s, '#186025'],
+    [x - 2*s, y - 12*s, 5*s, '#228a38'],
+    [x + 3*s, y - 10*s, 4*s, '#1e7832'],
+    [x, y - 15*s, 4*s, '#2a9a40'],
+  ];
+  leaves.forEach(([lx, ly, lr, lc]) => {
+    ctx.fillStyle = lc;
+    ctx.beginPath();
+    ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  // Leaf highlights
+  ctx.fillStyle = 'rgba(80,200,80,0.18)';
+  ctx.beginPath(); ctx.arc(x - 1*s, y - 9*s, 3*s, 0, Math.PI * 2); ctx.fill();
 }
 
-function drawBookshelf(x, y) {
-  ctx.fillStyle = '#2a1f14';
-  ctx.fillRect(x, y, 12, 18);
-  // Books
-  const colors = ['#3a4a6a','#6a3a3a','#3a6a3a','#5a5a3a'];
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = colors[i];
-    ctx.fillRect(x + 1 + i * 2.5, y + 1, 2, 7);
+function drawBookshelf(x, y, compact) {
+  const bw = compact ? 18 : 22;
+  const bh = compact ? 22 : 28;
+  // Shelf frame (wood)
+  ctx.fillStyle = '#2e1e10';
+  ctx.fillRect(x, y, bw, bh);
+  // Back panel
+  ctx.fillStyle = '#1e1208';
+  ctx.fillRect(x + 1, y + 1, bw - 2, bh - 2);
+  // Shelf dividers
+  ctx.fillStyle = '#2e1e10';
+  ctx.fillRect(x + 1, y + Math.floor(bh/2), bw - 2, 2);
+  // Top row books
+  const bookCols1 = ['#4a5a7a','#7a3a3a','#3a7a4a','#6a5a2a','#5a3a6a'];
+  const bookCols2 = ['#4a7a5a','#7a4a3a','#3a4a6a','#5a3a3a','#3a6a6a'];
+  const bSlotW = (bw - 4) / 5;
+  for (let i = 0; i < 5; i++) {
+    const bx = x + 2 + i * bSlotW;
+    const hv = Math.floor(bh/2) - 3 - (i % 3) * 2;
+    ctx.fillStyle = bookCols1[i];
+    ctx.fillRect(bx, y + 2, bSlotW - 1, hv);
+    // Book spine highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(bx, y + 2, 1, hv);
   }
-  for (let i = 0; i < 3; i++) {
-    ctx.fillStyle = colors[i + 1];
-    ctx.fillRect(x + 1 + i * 3.5, y + 10, 3, 7);
+  // Bottom row books
+  for (let i = 0; i < 5; i++) {
+    const bx = x + 2 + i * bSlotW;
+    const hv = Math.floor(bh/2) - 2 - (i % 2) * 3;
+    ctx.fillStyle = bookCols2[i % bookCols2.length];
+    ctx.fillRect(bx, y + Math.floor(bh/2) + 2, bSlotW - 1, hv);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(bx, y + Math.floor(bh/2) + 2, 1, hv);
   }
 }
 
@@ -902,58 +1022,285 @@ function updateSprites(dt) {
   }
 }
 
+// ── Room-specific decoration helpers ──
+function drawWindowGlow(x, y, w, h) {
+  // Window frame
+  ctx.fillStyle = '#1e2a3a';
+  ctx.fillRect(x, y, w, h);
+  // Window glow (city light)
+  const wg = ctx.createLinearGradient(x, y, x, y + h);
+  wg.addColorStop(0, '#1a3060');
+  wg.addColorStop(0.5, '#0e1e40');
+  wg.addColorStop(1, '#060e20');
+  ctx.fillStyle = wg;
+  ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+  // Window pane divisions
+  ctx.strokeStyle = '#1a2a3a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + w/2, y + 2);
+  ctx.lineTo(x + w/2, y + h - 2);
+  ctx.moveTo(x + 2, y + h/2);
+  ctx.lineTo(x + w - 2, y + h/2);
+  ctx.stroke();
+  // Glow reflection
+  ctx.fillStyle = 'rgba(60,100,200,0.15)';
+  ctx.fillRect(x + 2, y + 2, w - 4, 4);
+}
+
+function drawWhiteboard(x, y, w, h) {
+  // Board frame
+  ctx.fillStyle = '#2a3040';
+  ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+  // Board surface
+  ctx.fillStyle = '#e8ecf0';
+  ctx.fillRect(x, y, w, h);
+  // Chart lines (blue)
+  ctx.strokeStyle = '#5090d0';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x + 3, y + h - 4);
+  ctx.lineTo(x + 3, y + 3);
+  ctx.moveTo(x + 3, y + h - 4);
+  ctx.lineTo(x + w - 2, y + h - 4);
+  ctx.stroke();
+  // Bar chart bars
+  const barColors = ['#4f9eff','#3ddc84','#ffd166'];
+  for (let bi = 0; bi < 3; bi++) {
+    const bh2 = (h - 8) * (0.4 + bi * 0.2);
+    ctx.fillStyle = barColors[bi];
+    ctx.fillRect(x + 5 + bi * ((w - 7) / 3), y + h - 4 - bh2, (w - 7) / 3 - 2, bh2);
+  }
+}
+
+function drawGreenScreen(x, y, w, h) {
+  // Frame
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+  // Green screen
+  ctx.fillStyle = '#1a5a2a';
+  ctx.fillRect(x, y, w, h);
+  // Screen sheen
+  ctx.fillStyle = 'rgba(60,200,80,0.08)';
+  ctx.fillRect(x, y, w/2, h/3);
+  // Studio light cone (faint)
+  ctx.fillStyle = 'rgba(255,255,200,0.04)';
+  ctx.beginPath();
+  ctx.moveTo(x + w/2, y - 6);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+  ctx.fill();
+  // Camera icon (small tripod)
+  ctx.fillStyle = '#3a3a3a';
+  ctx.fillRect(x + w - 10, y + h - 8, 8, 5);
+  ctx.strokeStyle = '#4a4a4a';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x + w - 6, y + h - 3);
+  ctx.lineTo(x + w - 8, y + h);
+  ctx.moveTo(x + w - 6, y + h - 3);
+  ctx.lineTo(x + w - 4, y + h);
+  ctx.moveTo(x + w - 6, y + h - 3);
+  ctx.lineTo(x + w - 6, y + h);
+  ctx.stroke();
+}
+
+function drawWorldMap(x, y, w, h) {
+  // Frame
+  ctx.fillStyle = '#1a2030';
+  ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+  // Map background (ocean)
+  ctx.fillStyle = '#0e1830';
+  ctx.fillRect(x, y, w, h);
+  // Land masses (simplified blobs)
+  ctx.fillStyle = '#2a4a2a';
+  ctx.beginPath(); ctx.ellipse(x + w*0.22, y + h*0.38, w*0.12, h*0.22, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + w*0.5, y + h*0.35, w*0.2, h*0.18, 0.2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + w*0.72, y + h*0.4, w*0.1, h*0.2, -0.1, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + w*0.55, y + h*0.65, w*0.07, h*0.1, 0, 0, Math.PI*2); ctx.fill();
+  // Location dots
+  ctx.fillStyle = '#f97316';
+  [[0.22,0.38],[0.5,0.35],[0.72,0.4]].forEach(([fx,fy]) => {
+    ctx.beginPath(); ctx.arc(x + w*fx, y + h*fy, 1.5, 0, Math.PI*2); ctx.fill();
+  });
+}
+
+function drawTrophy(x, y) {
+  ctx.fillStyle = '#c8a420';
+  ctx.fillRect(x - 4, y - 8, 8, 6);    // cup body
+  ctx.fillRect(x - 5, y - 8, 10, 2);   // cup rim
+  ctx.fillStyle = '#a88818';
+  ctx.fillRect(x - 1, y - 2, 3, 4);    // stem
+  ctx.fillRect(x - 4, y + 2, 8, 2);    // base
+  // Star
+  ctx.fillStyle = '#ffd166';
+  ctx.font = '6px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('★', x, y - 4);
+  ctx.textAlign = 'start';
+}
+
+function drawSofa(x, y, w) {
+  // Sofa base
+  ctx.fillStyle = '#2a2040';
+  ctx.fillRect(x, y, w, 8);
+  // Cushions
+  ctx.fillStyle = '#3a3060';
+  ctx.fillRect(x + 1, y - 5, w/2 - 2, 6);
+  ctx.fillRect(x + w/2 + 1, y - 5, w/2 - 2, 6);
+  // Back
+  ctx.fillStyle = '#2e2855';
+  ctx.fillRect(x, y - 5, 3, 12);
+  ctx.fillRect(x + w - 3, y - 5, 3, 12);
+  // Armrest highlights
+  ctx.fillStyle = '#4a4070';
+  ctx.fillRect(x, y - 5, w, 2);
+}
+
 // ── Main render ──
 function drawOffice() {
   ctx.clearRect(0, 0, W, H);
-  // Background
-  ctx.fillStyle = '#080c18';
+
+  // Dark exterior background
+  ctx.fillStyle = '#0a0e18';
   ctx.fillRect(0, 0, W, H);
 
-  // Banner (matches reference: dark panel + gold title + subtitle)
-  ctx.fillStyle = '#0c1228';
-  ctx.fillRect(0, 0, W, 30);
-  ctx.fillStyle = '#1a3060'; ctx.fillRect(0, 28, W, 2);
-  ctx.textAlign = 'center';
-  ctx.font = `bold 14px 'Rajdhani',sans-serif`;
-  ctx.fillStyle = '#c8a84a';
-  ctx.fillText('L&D Legacy Office', W/2, 13);
-  ctx.font = `8px 'Share Tech Mono',monospace`;
-  ctx.fillStyle = '#4a6a8a';
-  ctx.fillText('OWNDAYS AI CREW', W/2, 25);
-  ctx.textAlign = 'start';
+  // Outer wall frame (medium-dark gray)
+  const wallOuter = '#252c3a';
+  const padX = 10, padY = 36;
+  ctx.fillStyle = wallOuter;
+  ctx.fillRect(0, padY, W, H - padY);
 
-  // Draw rooms
+  // Window panels on left and right sides (blue city-night glow)
+  const winH = 20, winW = 18, winSpacing = 30;
+  for (let wy = padY + 8; wy < H - 16; wy += winSpacing) {
+    drawWindowGlow(4, wy, winW, winH);
+    drawWindowGlow(W - winW - 4, wy, winW, winH);
+  }
+
+  // Top edge windows (between banner and rooms)
+  for (let wx = 50; wx < W - 50; wx += 60) {
+    drawWindowGlow(wx, padY + 2, 24, 10);
+  }
+
+  // ── Top Banner ──
+  // Banner background (dark navy)
+  ctx.fillStyle = '#0c1228';
+  ctx.fillRect(0, 0, W, padY);
+  // Subtle gradient at bottom of banner
+  const bannerGrad = ctx.createLinearGradient(0, padY - 8, 0, padY);
+  bannerGrad.addColorStop(0, 'rgba(26,48,96,0)');
+  bannerGrad.addColorStop(1, 'rgba(26,48,96,0.5)');
+  ctx.fillStyle = bannerGrad;
+  ctx.fillRect(0, padY - 8, W, 8);
+  // Banner bottom border (blue glow)
+  ctx.fillStyle = '#1a3060';
+  ctx.fillRect(0, padY - 2, W, 2);
+  // Decorative banner side accents
+  ctx.fillStyle = '#c8a84a';
+  ctx.fillRect(8, 4, 3, padY - 8);
+  ctx.fillRect(W - 11, 4, 3, padY - 8);
+  // Main title
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `bold 16px 'Rajdhani', sans-serif`;
+  ctx.fillStyle = '#c8a84a';
+  ctx.shadowColor = 'rgba(200,168,74,0.5)';
+  ctx.shadowBlur = 8;
+  ctx.fillText('L&D Legacy Office', W / 2, 13);
+  ctx.shadowBlur = 0;
+  // Subtitle
+  ctx.font = `bold 8px 'Share Tech Mono', monospace`;
+  ctx.fillStyle = '#5a7a9a';
+  ctx.fillText('OWNDAYS AI CREW', W / 2, 26);
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+
+  // ── Draw all rooms ──
   rooms.forEach((rm, i) => {
     drawFloor(rm);
-    drawDesk(rm.cx, rm.cy, rm.w);
-    drawChair(rm.cx, rm.cy);
-    // Decorations (deterministic per room)
-    if (i % 3 === 0) drawPlant(rm.x + 16, rm.y + rm.h - 18);
-    if (i % 4 === 1) drawBookshelf(rm.x + rm.w - 20, rm.y + 8);
-    if (i % 5 === 2) {
-      // Whiteboard
-      ctx.fillStyle = '#e8e8e8';
-      ctx.fillRect(rm.x + rm.w - 28, rm.y + 6, 18, 12);
-      ctx.strokeStyle = '#aaa';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(rm.x + rm.w - 28, rm.y + 6, 18, 12);
+
+    const nameplateH = 21; // height taken by nameplate
+    const agent = rm.agent;
+
+    // Desk positioned in lower-middle of room
+    const deskY = rm.y + rm.h * 0.58;
+    drawDesk(rm.cx, deskY, rm.w);
+    drawChair(rm.cx, deskY);
+
+    // ── Room 0: Boss Peanut — executive corner office ──
+    if (i === 0) {
+      // Bookshelf on back wall
+      drawBookshelf(rm.x + 8, rm.y + nameplateH + 4, false);
+      drawBookshelf(rm.x + 32, rm.y + nameplateH + 4, false);
+      // Trophy shelf
+      drawTrophy(rm.x + rm.w - 18, rm.y + nameplateH + 10);
+      // Sofa / meeting area
+      drawSofa(rm.x + rm.w * 0.45, rm.y + rm.h * 0.68, rm.w * 0.38);
+      // Plants in corners
+      drawPlant(rm.x + 10, rm.y + rm.h - 22, 1.2);
+      drawPlant(rm.x + rm.w - 18, rm.y + rm.h - 22, 1.0);
+      // Extra plant top-right
+      drawPlant(rm.x + rm.w - 16, rm.y + nameplateH + 10, 0.8);
     }
-    // Room label
-    if (rm.agent) {
-      ctx.font = '8px Share Tech Mono, monospace';
-      ctx.fillStyle = '#2a3a50';
-      ctx.fillText(rm.agent.em + ' ' + rm.agent.name, rm.x + 5, rm.y + rm.h - 5);
+    // ── Rooms 1-4 (Rocket, Atlas, Pulse, Sage) — top strip ──
+    else if (i >= 1 && i <= 4) {
+      drawBookshelf(rm.x + rm.w - 26, rm.y + nameplateH + 2, true);
+      if (i % 2 === 0) drawPlant(rm.x + 8, rm.y + rm.h - 18, 0.9);
+      if (i % 2 === 1) drawPlant(rm.x + rm.w - 14, rm.y + rm.h - 18, 0.9);
+    }
+    // ── Rooms 5-8 (Guard, Coin, Lex, People) — middle row ──
+    else if (i >= 5 && i <= 8) {
+      if (i % 2 === 0) {
+        drawBookshelf(rm.x + 5, rm.y + nameplateH + 2, true);
+        drawPlant(rm.x + rm.w - 14, rm.y + rm.h - 18, 0.9);
+      } else {
+        drawPlant(rm.x + 8, rm.y + rm.h - 18, 0.9);
+        drawBookshelf(rm.x + rm.w - 26, rm.y + nameplateH + 2, true);
+      }
+    }
+    // ── Room 9: Pixel — Web Admin (extra monitor showing od-connect.com) ──
+    else if (i === 9) {
+      drawPlant(rm.x + 6, rm.y + rm.h - 18, 0.9);
+      drawBookshelf(rm.x + rm.w - 26, rm.y + nameplateH + 2, true);
+      // Extra small monitor
+      const ex = rm.cx + rm.w * 0.12;
+      const ey = deskY - 11;
+      ctx.fillStyle = '#0e1520';
+      ctx.fillRect(ex, ey - 9, 16, 8);
+      ctx.fillStyle = '#0a2040';
+      ctx.fillRect(ex + 1, ey - 8, 14, 6);
+      ctx.font = '4px Share Tech Mono,monospace';
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText('od-connect', ex + 1, ey - 4);
+      ctx.textAlign = 'start';
+    }
+    // ── Room 10: Sigma — Data Analyst (charts on whiteboard) ──
+    else if (i === 10) {
+      drawWhiteboard(rm.x + rm.w - 32, rm.y + nameplateH + 3, 26, 18);
+      drawPlant(rm.x + 6, rm.y + rm.h - 18, 0.9);
+    }
+    // ── Room 11: Lens — Creator AI (green screen + studio setup) ──
+    else if (i === 11) {
+      drawGreenScreen(rm.x + 6, rm.y + nameplateH + 3, 28, 20);
+      drawPlant(rm.x + rm.w - 12, rm.y + rm.h - 18, 0.85);
+    }
+    // ── Room 12: Rex — Retail MD (world map on wall) ──
+    else if (i === 12) {
+      drawWorldMap(rm.x + 5, rm.y + nameplateH + 2, 30, 18);
+      drawPlant(rm.x + rm.w - 12, rm.y + rm.h - 18, 0.9);
     }
   });
 
-  // Draw characters on top
+  // ── Draw characters on top of everything ──
   rooms.forEach((rm, i) => {
     const spr = sprites[i];
     if (!rm.agent || !spr) return;
     drawCharacter(spr.x, spr.y, rm.agent, spr, i === 0);
   });
 
-  // Selected highlight
+  // ── Selected room highlight ──
   if (selectedAgent) {
     const ri = ROOM_ORDER.findIndex(a => a.id === selectedAgent);
     if (ri >= 0 && rooms[ri]) {
