@@ -944,6 +944,77 @@ def api_memory_history():
         return jsonify({"metric": metric, "history": [], "error": str(e)})
 
 
+@app.route("/api/memory-seed", methods=["POST"])
+def api_memory_seed():
+    """
+    Seed historical memory ด้วยข้อมูลปัจจุบันทันที
+    เรียกจาก Dashboard เพื่อให้มีข้อมูลแรก (ไม่ต้องรอ watch cycle)
+    """
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from historical_memory import record_snapshot
+        from dashboard_api import fetch_dashboard
+        snapped = {}
+
+        # ── Survey ──────────────────────────────────────────────
+        try:
+            d = fetch_dashboard("survey")
+            actual = d.get("actual", 0)
+            budget = d.get("budget", 1) or 1
+            sv = {
+                "survey.overall_avg":     float(d.get("overall_avg", 0)),
+                "survey.total_responses": int(d.get("total_responses", 0)),
+            }
+            record_snapshot("pulse", sv)
+            snapped["survey"] = sv
+        except Exception as e:
+            snapped["survey_error"] = str(e)
+
+        # ── Cost ────────────────────────────────────────────────
+        try:
+            d = fetch_dashboard("cost")
+            actual = float(d.get("actual", 0))
+            budget = float(d.get("budget", 1) or 1)
+            cv = {
+                "cost.actual":    actual,
+                "cost.budget":    budget,
+                "cost.usage_pct": actual / budget * 100,
+            }
+            record_snapshot("coin", cv)
+            snapped["cost"] = cv
+        except Exception as e:
+            snapped["cost_error"] = str(e)
+
+        # ── OAR ─────────────────────────────────────────────────
+        try:
+            d = fetch_dashboard("oar")
+            ov = {"oar.total": int(d.get("total", 0))}
+            record_snapshot("pulse", ov)
+            snapped["oar"] = ov
+        except Exception as e:
+            snapped["oar_error"] = str(e)
+
+        # ── Website uptime (quick ping) ─────────────────────────
+        try:
+            import requests as req, time
+            t0 = time.time()
+            resp = req.get("https://od-connect.com", timeout=8, allow_redirects=True)
+            lat  = int((time.time() - t0) * 1000)
+            is_up = 1 if resp.status_code < 400 else 0
+            wv = {"website.is_up": is_up, "website.latency_ms": lat}
+            record_snapshot("pixel", wv)
+            snapped["website"] = wv
+        except Exception as e:
+            snapped["website_error"] = str(e)
+
+        log_agent("dashboard", "memory", "seed snapshot", str(snapped))
+        return jsonify({"ok": True, "snapped": snapped})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 _start_agent_bus()
 start_scheduler()
 start_autonomous_watchers()

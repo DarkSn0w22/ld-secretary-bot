@@ -621,12 +621,28 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
           <div id="trends-panel"
                style="flex-shrink:0;padding:6px 8px;background:var(--bg);
                       border-bottom:1px solid var(--border);overflow:hidden;
-                      transition:max-height .2s ease;max-height:130px;">
+                      transition:max-height .2s ease;max-height:155px;">
+            <!-- Seed button row -->
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        margin-bottom:5px;">
+              <span style="font-size:8px;color:var(--text3);" id="trends-status">
+                กด Seed เพื่อเริ่มเก็บข้อมูล
+              </span>
+              <button id="trends-seed-btn" onclick="seedMemory()"
+                style="padding:2px 8px;background:var(--panel2);border:1px solid var(--border);
+                       border-radius:4px;color:var(--cyan);font-size:9px;
+                       font-family:'Rajdhani',sans-serif;font-weight:700;
+                       cursor:pointer;letter-spacing:.5px;transition:.15s;"
+                onmouseover="this.style.borderColor='var(--cyan)'"
+                onmouseout="this.style.borderColor='var(--border)'">
+                🌱 Seed Now
+              </button>
+            </div>
             <div id="trends-grid"
                  style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
               <div style="color:var(--text3);font-size:9px;grid-column:1/-1;text-align:center;
-                          padding:8px 0;" id="trends-loading">
-                ⏳ กำลังโหลด trends...
+                          padding:6px 0;" id="trends-loading">
+                ⏳ กำลังโหลด...
               </div>
             </div>
           </div>
@@ -2693,11 +2709,22 @@ function mobNotifyChat() {
 // ── KPI Trends (Historical Memory) ───────────────────────────────────────────
 let _trendsVisible = true;
 
+const TREND_META = {
+  'survey.overall_avg':  { label:'Survey Avg',   fmt: v => v.toFixed(2)+'/4.0' },
+  'cost.usage_pct':      { label:'Budget Used',  fmt: v => v.toFixed(1)+'%'    },
+  'oar.total':           { label:'OAR Total',    fmt: v => Math.round(v).toLocaleString() },
+  'website.sessions_7d': { label:'Web Sessions', fmt: v => Math.round(v).toLocaleString() },
+  'website.latency_ms':  { label:'Web Latency',  fmt: v => Math.round(v)+'ms'  },
+  'hr.probation_count':  { label:'Probation',    fmt: v => Math.round(v)+' คน' },
+};
+const TREND_SHOW = Object.keys(TREND_META);
+const CMAP = {green:'#4ade80', red:'#ff5c5c', gray:'#4a6080', unknown:'#2a4060'};
+
 function toggleTrendsPanel() {
   _trendsVisible = !_trendsVisible;
   const panel = document.getElementById('trends-panel');
   const tog   = document.getElementById('trends-toggle');
-  if (panel) panel.style.maxHeight = _trendsVisible ? '130px' : '0px';
+  if (panel) panel.style.maxHeight = _trendsVisible ? '155px' : '0px';
   if (tog)   tog.textContent = _trendsVisible ? '▼ hide' : '▶ show';
 }
 
@@ -2707,60 +2734,67 @@ async function loadKpiTrends() {
     if (!r.ok) return;
     const d = await r.json();
     renderTrends(d.trends || {});
+    const st = document.getElementById('trends-status');
+    const hasData = Object.values(d.trends||{}).some(t => t.current !== null && t.current !== undefined);
+    if (st) st.textContent = hasData
+      ? 'อัพเดท ' + new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})
+      : 'ยังไม่มีข้อมูล — กด Seed';
   } catch(e) {
     const g = document.getElementById('trends-grid');
-    if (g) g.innerHTML = '<div style="color:var(--text3);font-size:9px;grid-column:1/-1;text-align:center;padding:6px;">— ยังไม่มี trend data —</div>';
+    if (g) g.innerHTML = '<div style="color:var(--text3);font-size:9px;grid-column:1/-1;text-align:center;padding:6px;">เชื่อมต่อไม่ได้</div>';
   }
 }
 
 function renderTrends(trends) {
   const grid = document.getElementById('trends-grid');
   if (!grid) return;
-
-  const SHOW = [
-    'survey.overall_avg',
-    'cost.usage_pct',
-    'oar.total',
-    'website.sessions_7d',
-    'website.latency_ms',
-    'hr.probation_count',
-  ];
-
-  const COLOR_MAP = {green: '#4ade80', red: '#ff5c5c', gray: '#4a6080'};
-  const FMT = {
-    'survey.overall_avg':   v => v.toFixed(2) + '/4.0',
-    'cost.usage_pct':       v => v.toFixed(1) + '%',
-    'oar.total':            v => Math.round(v).toLocaleString(),
-    'website.sessions_7d':  v => Math.round(v).toLocaleString(),
-    'website.latency_ms':   v => Math.round(v) + 'ms',
-    'hr.probation_count':   v => Math.round(v) + ' คน',
-  };
-
-  const cards = SHOW.map(key => {
-    const t = trends[key];
-    if (!t || t.current === null) {
-      return `<div style="background:var(--panel);border-radius:4px;padding:5px 7px;border:1px solid var(--border);">
-        <div style="font-size:8px;color:var(--text3);">${key.split('.')[1]}</div>
-        <div style="font-size:10px;color:var(--text3);">—</div>
-      </div>`;
-    }
-    const fmt    = FMT[key] || (v => v.toFixed(1));
-    const color  = COLOR_MAP[t.color] || COLOR_MAP.gray;
-    const chgTxt = t.change_pct != null ? ` (${t.change_pct > 0 ? '+' : ''}${t.change_pct.toFixed(1)}%)` : '';
+  const cards = TREND_SHOW.map(key => {
+    const meta   = TREND_META[key];
+    const t      = trends[key] || {};
+    const hasVal = t.current !== null && t.current !== undefined;
+    const color  = CMAP[t.color] || CMAP.unknown;
+    const valTxt = hasVal ? meta.fmt(t.current) : '—';
+    const arrow  = hasVal ? (t.arrow || '→') : '';
+    const chg    = (hasVal && t.change_pct != null)
+      ? `${t.change_pct > 0?'+':''}${t.change_pct.toFixed(1)}%` : '';
+    const sub = !hasVal
+      ? `<span style="color:#1e3050;font-size:8px;">กด Seed</span>`
+      : t.data_points < 2
+        ? `<span style="color:#2a4060;font-size:8px;">รอ 2nd snapshot</span>`
+        : `<span style="color:#3a5570;font-size:8px;">${chg} · ${t.data_points}pts</span>`;
     return `<div style="background:var(--panel);border-radius:4px;padding:5px 7px;
                          border:1px solid var(--border);border-left:2px solid ${color};">
-      <div style="font-size:8px;color:var(--text3);margin-bottom:1px;">${t.label || key.split('.')[1]}</div>
-      <div style="display:flex;align-items:center;gap:4px;">
-        <span style="font-size:11px;font-family:'Rajdhani',sans-serif;font-weight:700;color:${color};">${fmt(t.current)}</span>
-        <span style="font-size:10px;color:${color};" title="${chgTxt}">${t.arrow}</span>
+      <div style="font-size:8px;color:var(--text3);margin-bottom:1px;">${meta.label}</div>
+      <div style="display:flex;align-items:center;gap:3px;">
+        <span style="font-size:11px;font-family:'Rajdhani',sans-serif;font-weight:700;
+          color:${hasVal?color:'#2a4060'};">${valTxt}</span>
+        ${hasVal?`<span style="font-size:10px;color:${color};">${arrow}</span>`:''}
       </div>
-      ${t.data_points < 2
-        ? '<div style="font-size:8px;color:var(--text3);">รอ snapshot ถัดไป</div>'
-        : `<div style="font-size:8px;color:#3a5070;">${chgTxt || ''} · ${t.data_points}pts</div>`}
+      ${sub}
     </div>`;
   });
-
   grid.innerHTML = cards.join('');
+}
+
+async function seedMemory() {
+  const btn = document.getElementById('trends-seed-btn');
+  const st  = document.getElementById('trends-status');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Seeding...'; }
+  if (st)  st.textContent = 'กำลังดึงข้อมูล...';
+  try {
+    const r = await fetch('/api/memory-seed', {method:'POST', headers:AUTH_HEADERS});
+    const d = await r.json();
+    if (d.ok) {
+      if (st) st.textContent = '✅ Seed สำเร็จ!';
+      await loadKpiTrends();
+    } else {
+      if (st) st.textContent = '❌ ' + (d.error||'error');
+    }
+  } catch(e) {
+    if (st) st.textContent = '❌ ' + e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🌱 Seed Now'; }
+  }
 }
 
 // โหลด trends ตอน init + refresh ทุก 10 นาที
