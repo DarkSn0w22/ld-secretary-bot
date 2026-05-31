@@ -31,28 +31,48 @@ _folder_id_cache: dict = {}
 
 
 def _get_drive_service():
+    """สร้าง Drive service — ลำดับ: OAuth user token → service account"""
     global _drive_service
     if _drive_service:
         return _drive_service
     try:
         from googleapiclient.discovery import build
-        from google.oauth2 import service_account
 
+        # ── วิธีที่ 1: OAuth refresh token ของ user (ไม่มีปัญหา quota) ──
+        refresh_token = os.getenv("GOOGLE_DRIVE_REFRESH_TOKEN", "")
+        client_id     = os.getenv("GOOGLE_DRIVE_CLIENT_ID", "") or os.getenv("GA4_OAUTH_CLIENT_ID", "")
+        client_secret = os.getenv("GOOGLE_DRIVE_CLIENT_SECRET", "") or os.getenv("GA4_OAUTH_CLIENT_SECRET", "")
+
+        if refresh_token and client_id and client_secret:
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            creds = Credentials(
+                token=None,
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=client_id,
+                client_secret=client_secret,
+                scopes=["https://www.googleapis.com/auth/drive"],
+            )
+            creds.refresh(Request())
+            _drive_service = build("drive", "v3", credentials=creds)
+            print("[Drive] using OAuth user credentials ✓")
+            return _drive_service
+
+        # ── วิธีที่ 2: Service Account (อาจติด quota issue) ──
+        from google.oauth2 import service_account
         creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
         SCOPES = ["https://www.googleapis.com/auth/drive"]
-
         if creds_json:
             creds_dict = json.loads(base64.b64decode(creds_json).decode())
-            creds = service_account.Credentials.from_service_account_info(
-                creds_dict, scopes=SCOPES
-            )
+            creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
         else:
-            key_file = os.getenv("GOOGLE_KEY_FILE", "credentials.json")
             creds = service_account.Credentials.from_service_account_file(
-                key_file, scopes=SCOPES
-            )
+                os.getenv("GOOGLE_KEY_FILE", "credentials.json"), scopes=SCOPES)
         _drive_service = build("drive", "v3", credentials=creds)
+        print("[Drive] using service account credentials")
         return _drive_service
+
     except Exception as e:
         print(f"[Drive] service init error: {e}")
         return None
