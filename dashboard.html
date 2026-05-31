@@ -97,7 +97,8 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 /* ── Center Panel ── */
 .cpanel{display:flex;flex-direction:column;overflow:hidden;}
 #oc{display:block;cursor:crosshair;flex:1;min-height:0;}
-.chat-strip{height:160px;min-height:100px;flex-shrink:0;display:flex;flex-direction:column;border-top:1px solid var(--border);}
+/* chat-strip no longer used in main layout */
+.chat-strip{display:none;}
 
 /* ── Command Bar ── */
 .cmdbar{display:flex;gap:5px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;}
@@ -127,7 +128,13 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 .cline.err .ca{color:var(--red);}
 
 /* ── Right Panel ── */
-.rpanel{border-left:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow-y:auto;}
+.rpanel{border-left:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden;transition:width .2s ease;}
+.rpanel.hidden{width:28px!important;min-width:28px!important;}
+.rpanel.hidden #rpanel-body{display:none;}
+#rpanel-body{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+/* Resize handle */
+.rpanel{position:relative;}
+.rpanel::before{content:'';position:absolute;left:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:10;}
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:8px;}
 .sb{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;}
 .sv{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;text-shadow:0 0 6px currentColor;}
@@ -225,37 +232,60 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
         <div class="alist" id="alist"></div>
       </div>
       <!-- Center: Canvas + Chat -->
+      <!-- Center: canvas only (chat moved to right panel) -->
       <div class="cpanel">
         <canvas id="oc"></canvas>
-        <div class="chat-strip">
-          <div class="cmdbar">
-            <select class="csel" id="cmd-agent"></select>
-            <input class="cinput" id="cmd-input" placeholder="พิมพ์คำสั่งให้ agent...">
-            <button class="cbtn" id="cmd-run">RUN ▶</button>
-          </div>
-          <div class="rp" id="cmd-resp"></div>
-          <div class="chatlog" id="chatlog"></div>
-        </div>
       </div>
-      <!-- Right: Stats + Detail -->
-      <div class="rpanel">
-        <div class="ph">Quick Stats</div>
-        <div class="sgrid">
-          <div class="sb"><div class="sv" style="color:var(--blue)">400+</div><div class="sl">Employees</div></div>
-          <div class="sb"><div class="sv" style="color:var(--green)">18</div><div class="sl">Trainers</div></div>
-          <div class="sb"><div class="sv" style="color:var(--purple)">16</div><div class="sl">Courses</div></div>
-          <div class="sb"><div class="sv" style="color:var(--orange)">5</div><div class="sl">Areas</div></div>
+      <!-- Right: Stats + Command + Chat (resizable/collapsible) -->
+      <div class="rpanel" id="rpanel">
+        <!-- Toggle hide button -->
+        <div class="ph" style="cursor:pointer;user-select:none;" onclick="toggleRPanel()">
+          Quick Stats
+          <span id="rpanel-toggle" style="font-size:10px;color:var(--blue);margin-left:auto;">◀ hide</span>
         </div>
-        <div class="ph">Scheduled Jobs</div>
-        <div class="sched">
-          <div class="si"><span class="st">09:00</span><div><div class="sn">Morning Report</div><div class="sa">by Rocket</div></div><div class="sdot"></div></div>
-          <div class="si"><span class="st">12:00</span><div><div class="sn">KPI Check</div><div class="sa">by Sigma</div></div><div class="sdot"></div></div>
-          <div class="si"><span class="st">17:00</span><div><div class="sn">Daily Summary</div><div class="sa">by Sage</div></div><div class="sdot"></div></div>
-        </div>
-        <div class="ph">Agent Detail</div>
-        <div class="det" id="det">
-          <div style="color:var(--text3);font-size:10px;text-align:center;padding:20px;">Click an agent to view details</div>
-        </div>
+        <div id="rpanel-body">
+          <div class="sgrid">
+            <div class="sb"><div class="sv" style="color:var(--blue)">400+</div><div class="sl">Employees</div></div>
+            <div class="sb"><div class="sv" style="color:var(--green)">18</div><div class="sl">Trainers</div></div>
+            <div class="sb"><div class="sv" style="color:var(--purple)">16</div><div class="sl">Courses</div></div>
+            <div class="sb"><div class="sv" style="color:var(--orange)">5</div><div class="sl">Areas</div></div>
+          </div>
+
+          <!-- Command bar (moved from bottom) -->
+          <div class="ph" style="border-top:1px solid var(--border);">
+            💬 Command
+            <select class="csel" id="cmd-agent" style="margin-left:auto;max-width:90px;font-size:9px;padding:2px 4px;"></select>
+          </div>
+          <div style="padding:6px 8px;display:flex;gap:4px;background:var(--panel);">
+            <input class="cinput" id="cmd-input" placeholder="พิมพ์คำสั่ง..." style="font-size:10px;">
+            <button class="cbtn" id="cmd-run" style="padding:4px 10px;font-size:11px;">▶</button>
+          </div>
+          <div class="rp" id="cmd-resp" style="margin:0 8px 4px;max-height:55px;"></div>
+
+          <!-- Agent chat log -->
+          <div class="ph" style="border-top:1px solid var(--border);">
+            💬 Agent Chat
+            <span id="chat-live" style="font-size:9px;color:var(--green);margin-left:auto;">● live</span>
+          </div>
+          <div class="chatlog" id="chatlog" style="flex:1;min-height:120px;max-height:none;"></div>
+
+          <!-- Agent Detail (collapsible) -->
+          <div class="ph" style="border-top:1px solid var(--border);cursor:pointer;" onclick="toggleDetPanel()">
+            🤖 Agent Detail
+            <span id="det-toggle" style="font-size:10px;color:var(--text2);margin-left:auto;">▼</span>
+          </div>
+          <div class="det" id="det">
+            <div style="color:var(--text3);font-size:10px;text-align:center;padding:12px;">คลิก agent เพื่อดูรายละเอียด</div>
+          </div>
+
+          <!-- Scheduled Jobs -->
+          <div class="ph" style="border-top:1px solid var(--border);">📅 Scheduled Jobs</div>
+          <div class="sched">
+            <div class="si"><span class="st">09:00</span><div><div class="sn">Morning Report</div><div class="sa">by Rocket</div></div><div class="sdot"></div></div>
+            <div class="si"><span class="st">12:00</span><div><div class="sn">KPI Check</div><div class="sa">by Sigma</div></div><div class="sdot"></div></div>
+            <div class="si"><span class="st">17:00</span><div><div class="sn">Daily Summary</div><div class="sa">by Sage</div></div><div class="sdot"></div></div>
+          </div>
+        </div><!-- /rpanel-body -->
       </div>
     </div>
   </div>
@@ -604,10 +634,9 @@ let sprites = [];      // character state per agent
 
 function resizeCanvas() {
   const rect = canvas.parentElement.getBoundingClientRect();
-  const cstrip = document.querySelector('.chat-strip');
-  const stripH = cstrip ? cstrip.offsetHeight : 160;
+  // Canvas fills the full cpanel height (chat is now in rpanel)
   W = canvas.width = rect.width;
-  H = canvas.height = rect.height - stripH;
+  H = canvas.height = rect.height;
   computeRooms();
   initSprites();
 }
@@ -1409,6 +1438,50 @@ function init() {
   ping();
   fetchAgentStatus();
 }
+
+// ── Right panel toggle (hide/show) ──
+function toggleRPanel() {
+  const rp = document.getElementById('rpanel');
+  const tog = document.getElementById('rpanel-toggle');
+  const hidden = rp.classList.toggle('hidden');
+  tog.textContent = hidden ? '▶ show' : '◀ hide';
+  setTimeout(resizeCanvas, 220);
+}
+
+// ── Agent Detail section toggle ──
+function toggleDetPanel() {
+  const det = document.getElementById('det');
+  const tog = document.getElementById('det-toggle');
+  const hidden = det.style.display === 'none';
+  det.style.display = hidden ? '' : 'none';
+  tog.textContent = hidden ? '▼' : '▶';
+}
+
+// ── Drag to resize right panel ──
+(function() {
+  const rp = document.getElementById('rpanel');
+  let dragging = false, startX = 0, startW = 0;
+  rp.addEventListener('mousedown', e => {
+    if (e.offsetX > -4 && e.offsetX < 4) {  // near left edge
+      dragging = true;
+      startX = e.clientX;
+      startW = rp.offsetWidth;
+      document.body.style.cursor = 'col-resize';
+      e.preventDefault();
+    }
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const delta = startX - e.clientX;
+    const newW = Math.max(200, Math.min(520, startW + delta));
+    rp.style.width = newW + 'px';
+    rp.style.minWidth = newW + 'px';
+    resizeCanvas();
+  });
+  document.addEventListener('mouseup', () => {
+    if (dragging) { dragging = false; document.body.style.cursor = ''; }
+  });
+})();
 
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('load', init);
