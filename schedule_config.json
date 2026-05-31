@@ -14,6 +14,14 @@
       "agent": "All Agents (11)",
       "task": "Monday All-Hands Meeting — ทุกแผนกรายงานสัปดาห์",
       "enabled": true
+    },
+    {
+      "type": "friday_review",
+      "time": "16:00",
+      "days": ["Fri"],
+      "agent": "Guard → Atlas",
+      "task": "Friday Review — Guard รีวิวสัปดาห์ + Atlas วางแผน 1-2 เดือน",
+      "enabled": true
     }
   ]
 }

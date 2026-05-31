@@ -293,6 +293,18 @@ def run_monday_meeting_background():
         log_agent("scheduler", "system", "[meeting] error", str(e), status="error")
 
 
+def run_friday_review_background():
+    """รัน Friday Weekly Review + Atlas Plan ใน background thread"""
+    try:
+        from friday_review import run_friday_review
+        print("[Scheduler] Launching Friday Review...")
+        run_friday_review(user_id=PEANUT_USER_ID)
+        print("[Scheduler] Friday review completed ✓")
+    except Exception as e:
+        print(f"[Scheduler] Friday review error: {e}")
+        log_agent("scheduler", "system", "[friday_review] error", str(e), status="error")
+
+
 # ── Monday Meeting config (อ่านจาก schedule_config.json) ────────────────────
 _MEETING_DEFAULT_HOUR   = 9
 _MEETING_DEFAULT_MINUTE = 30
@@ -310,13 +322,30 @@ def get_meeting_time():
     return _MEETING_DEFAULT_HOUR, _MEETING_DEFAULT_MINUTE
 
 
+_REVIEW_DEFAULT_HOUR   = 16
+_REVIEW_DEFAULT_MINUTE = 0
+
+def get_review_time():
+    """ดึงเวลา Friday Review จาก schedule_config.json"""
+    cfg = get_schedule_config()
+    for job in cfg.get("jobs", []):
+        if job.get("type") == "friday_review" and job.get("enabled", True):
+            try:
+                hh, mm = job["time"].split(":")
+                return int(hh), int(mm)
+            except Exception:
+                pass
+    return _REVIEW_DEFAULT_HOUR, _REVIEW_DEFAULT_MINUTE
+
+
 def scheduler_loop():
-    print("Scheduler started — morning report 09:00 + Monday all-hands 09:30 "
-          "+ autonomous watch 12:00")
+    print("Scheduler started — morning 09:00 | Mon all-hands 09:30 "
+          "| Fri review 16:00 | watch 12:00")
     sent_today        = None
     sent_digest_hours = set()
     sent_watch_hours  = set()
     sent_meeting_week = None   # ISO week string "YYYY-WW"
+    sent_review_week  = None   # ISO week string "YYYY-WW"
 
     while True:
         now     = datetime.now(BANGKOK_TZ)
@@ -359,6 +388,21 @@ def scheduler_loop():
                 name="monday-meeting"
             )
             meeting_thread.start()
+
+        # ── Friday Weekly Review + Atlas Plan ───────────────────────
+        rth, rtm = get_review_time()
+        if (weekday == 4 and                           # วันศุกร์
+                now.hour == rth and
+                now.minute == rtm and
+                sent_review_week != iso_wk):
+            print(f"[Scheduler] Friday Review {now.strftime('%H:%M')}...")
+            sent_review_week = iso_wk
+            review_thread = threading.Thread(
+                target=run_friday_review_background,
+                daemon=True,
+                name="friday-review"
+            )
+            review_thread.start()
 
         # ── Activity Digest ──────────────────────────────────────────
         if (now.hour in ACTIVITY_DIGEST_HOURS and

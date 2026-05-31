@@ -944,6 +944,29 @@ def api_memory_history():
         return jsonify({"metric": metric, "history": [], "error": str(e)})
 
 
+@app.route("/api/friday-review", methods=["POST"])
+def api_friday_review():
+    """Manual trigger: Friday Review — Guard รีวิว + Atlas วางแผน"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import threading
+        from friday_review import run_friday_review
+        log_agent("dashboard", "friday_review", "manual trigger: Friday Review")
+        threading.Thread(
+            target=run_friday_review,
+            kwargs={"user_id": PEANUT_USER_ID},
+            daemon=True,
+            name="manual-friday-review"
+        ).start()
+        return jsonify({
+            "ok":      True,
+            "message": "Friday Review เริ่มแล้ว — Guard + Atlas จะส่งรายงานไป LINE ใน 1-2 นาทีครับ"
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/weekly-meeting", methods=["POST"])
 def api_weekly_meeting():
     """

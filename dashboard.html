@@ -496,6 +496,19 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
         </svg>
         Rich Menu
       </button>
+      <!-- Friday Review button -->
+      <button id="review-btn" onclick="triggerFridayReview()" title="Friday Review — Guard รีวิวสัปดาห์ + Atlas วางแผน 1-2 เดือน"
+        style="display:flex;align-items:center;gap:5px;padding:5px 10px;
+               background:#141420;border:1px solid #2a2050;border-radius:5px;
+               color:#e879f9;font-size:10px;font-family:'Rajdhani',sans-serif;
+               font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;"
+        onmouseover="this.style.background='#1e1830';this.style.borderColor='#e879f9'"
+        onmouseout="this.style.background='#141420';this.style.borderColor='#2a2050'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
+        Review
+      </button>
       <!-- Weekly Meeting button -->
       <button id="meeting-btn" onclick="triggerMeeting()" title="Monday All-Hands Meeting — ทุกแผนกรายงาน"
         style="display:flex;align-items:center;gap:5px;padding:5px 10px;
@@ -547,6 +560,11 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
       <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
     </svg> Drive
   </a>
+  <button onclick="triggerFridayReview();toggleMobMenu();" style="color:#e879f9;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg> Review
+  </button>
   <button onclick="triggerMeeting();toggleMobMenu();" style="color:#ffd166;">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
@@ -2821,6 +2839,34 @@ async function seedMemory() {
 // โหลด trends ตอน init + refresh ทุก 10 นาที
 setTimeout(loadKpiTrends, 2000);
 setInterval(loadKpiTrends, 10 * 60 * 1000);
+
+// ── Friday Review ────────────────────────────────────────────────────────────
+async function triggerFridayReview() {
+  const btn = document.getElementById('review-btn');
+  if (!confirm('🛡️ เริ่ม Friday Review?\n\nGuard รีวิวผลงานสัปดาห์นี้\nAtlas วางแผน 1-2 เดือนข้างหน้า\n\nรายงานจะส่งมาใน LINE ใน ~1-2 นาทีครับ')) return;
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ กำลัง Review...'; }
+  try {
+    const r = await fetch('/api/friday-review', {method:'POST', headers:AUTH_HEADERS});
+    const d = await r.json();
+    if (d.ok) {
+      if (btn) {
+        btn.innerHTML = '✅ ส่งแล้ว!';
+        btn.style.color = '#3ddc84'; btn.style.borderColor = '#3ddc84';
+        setTimeout(() => {
+          btn.innerHTML = orig; btn.disabled = false;
+          btn.style.color = ''; btn.style.borderColor = '';
+        }, 5000);
+      }
+    } else {
+      alert('❌ ' + (d.error || 'ไม่สำเร็จ'));
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  } catch(e) {
+    alert('Network error: ' + e);
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
 
 // ── Weekly Meeting ────────────────────────────────────────────────────────────
 async function triggerMeeting() {
