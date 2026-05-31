@@ -614,23 +614,34 @@ function resizeCanvas() {
 
 function computeRooms() {
   rooms = [];
-  const padX = 10, padY = 36; // top padding for banner
+  const padX = 10, padY = 36;
   const gapX = 3, gapY = 3;
   const totalW = W - padX * 2;
   const totalH = H - padY - 10;
   const rowH = (totalH - gapY * (ROOM_ROWS - 1)) / ROOM_ROWS;
+
+  // Floor Y fraction per row — how far down from room top the walkable floor is
+  // Row 0 (Boss+Rocket+Atlas+Pulse+Sage): floor at ~78% (tall row, floor near bottom)
+  // Row 1 (Guard+Coin+Lex+People): floor at ~68%
+  // Row 2 (Pixel+Sigma+Lens+Rex): floor at ~70%
+  const FLOOR_FRAC = [0.78, 0.68, 0.70];
+
   let idx = 0;
   for (let r = 0; r < ROOM_ROWS; r++) {
     const cols = ROOM_COLS[r];
     const colW = (totalW - gapX * (cols - 1)) / cols;
+    const floorFrac = FLOOR_FRAC[r] || 0.72;
     for (let c = 0; c < cols; c++) {
       const x = padX + c * (colW + gapX);
       const y = padY + r * (rowH + gapY);
       const agent = ROOM_ORDER[idx];
+      const floorY = y + rowH * floorFrac;  // Y position of walkable floor
       rooms.push({
         x, y, w: colW, h: rowH, agent,
-        cx: x + colW / 2,       // desk center X
-        cy: y + rowH / 2 + 8,   // desk center Y
+        cx: x + colW / 2,
+        cy: floorY,           // sprite stands on the floor
+        floorY, floorFrac,    // used for wander bounds
+        row: r,
       });
       idx++;
     }
@@ -1000,9 +1011,11 @@ function updateSprites(dt) {
     // Movement timer
     spr.moveTimer -= dt;
     if (spr.moveTimer <= 0) {
-      // Pick new wander target within room
-      const wx = rm.cx + (Math.random() - 0.5) * rm.w * 0.4;
-      const wy = rm.cy + (Math.random() - 0.5) * rm.h * 0.25;
+      // Wander within floor area only (not above floor line)
+      const wx = rm.cx + (Math.random() - 0.5) * rm.w * 0.45;
+      const floorTop = rm.floorY - rm.h * 0.12;   // small range above floor center
+      const floorBot = rm.floorY + rm.h * 0.08;   // small range below floor center
+      const wy = floorTop + Math.random() * (floorBot - floorTop);
       spr.tx = wx;
       spr.ty = wy;
       spr.moveTimer = 80 + Math.random() * 200;
