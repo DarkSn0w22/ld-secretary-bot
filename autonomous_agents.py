@@ -224,6 +224,18 @@ def coin_watch() -> dict:
                         f"({ca:,.0f}/{cb:,.0f} บาท)"
                     )
 
+        # ── KPI Alert: ส่ง LINE ทันทีถ้าเกินเกณฑ์ ──────────────
+        try:
+            from kpi_alerts import alert_budget_usage
+            alert_budget_usage("L&D Budget รวม", usage_pct, actual, budget)
+            for cat in cost_data.get("categories", []):
+                if isinstance(cat, dict):
+                    cb, ca = cat.get("budget",0), cat.get("actual",0)
+                    if cb > 0:
+                        alert_budget_usage(cat.get("name","?"), ca/cb*100, ca, cb)
+        except Exception:
+            pass
+
         ideas = [
             "พิจารณาจัดทำ forecast รายเดือนเพื่อควบคุมงบ",
             "เปรียบเทียบ ROI ระหว่าง training format (online vs onsite)",
@@ -289,6 +301,18 @@ def pulse_watch() -> dict:
         if low_trainers:
             names = ", ".join(t.get("name", "?") for t in low_trainers)
             alerts.append(f"Trainer คะแนนต่ำกว่า 3.0: {names}")
+
+        # ── KPI Alert: survey score ต่ำ ─────────────────────────
+        try:
+            from kpi_alerts import alert_survey_low
+            survey = get_survey_dashboard()
+            trainers = survey.get("trainers", [])
+            for t in trainers:
+                score = float(t.get("avg_score", t.get("score", 9)))
+                if score < 9:  # valid score (not default 9)
+                    alert_survey_low(t.get("name","?"), score)
+        except Exception:
+            pass
 
         ideas = [
             "จัดทำ peer coaching session สำหรับ trainer คะแนนต่ำ",
@@ -409,6 +433,16 @@ def people_watch() -> dict:
                         f"พื้นที่ {code} มี probation สูง {prob}/{total} คน ({prob/total*100:.0f}%)"
                     )
 
+        # ── KPI Alert: probation ใกล้หมด ────────────────────────
+        try:
+            from kpi_alerts import alert_probation_expiring
+            from hr_agent import check_probation_alerts
+            expiring = check_probation_alerts(return_text=False) or []
+            if isinstance(expiring, list) and expiring:
+                alert_probation_expiring(expiring)
+        except Exception:
+            pass
+
         ideas = [
             "จัดทำ probation tracker แบบ real-time บน dashboard",
             "สร้าง onboarding checklist ดิจิทัลสำหรับพนักงานใหม่",
@@ -524,7 +558,20 @@ BLOG POSTS ล่าสุด:
             ideas.append(f"หน้า '{top_pages[0]['page']}' popular — ใช้เป็น template")
         ideas.append("สร้าง content calendar จาก traffic data รายสัปดาห์")
 
-        # ── Log analytics ให้ agent อื่นใช้ ─────────────────────
+        # ── KPI Alert: website ช้าหรือ down ────────────────────
+        try:
+            from kpi_alerts import alert_website_slow, alert_website_down
+            if uptime.get("status") not in ("up","ok","200"):
+                alert_website_down("od-connect.com", uptime.get("error","unknown"))
+            else:
+                lat = uptime.get("latency_ms", 0)
+                if lat:
+                    alert_website_slow("od-connect.com", lat)
+            for p in slow_pages:
+                alert_website_slow(p.get("path","/"), p.get("latency_ms",0))
+        except Exception:
+            pass
+
         log_agent("pixel", "rocket",
                   "analytics report พร้อมส่ง",
                   f"sessions={overview.get('sessions',0)}, "
