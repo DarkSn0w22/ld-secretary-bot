@@ -20,9 +20,9 @@ import os
 
 # ── ชื่อรุ่นพื้นฐาน (แก้ที่นี่ หรือ override ด้วย env) ──────────────
 SONNET = os.getenv("MODEL_SONNET", "claude-sonnet-4-5")
-
-# OPUS: ถ้ายังไม่ตั้ง env MODEL_OPUS จะใช้ Sonnet ไปก่อน (ปลอดภัย ไม่พัง)
-OPUS = os.getenv("MODEL_OPUS", SONNET)
+OPUS   = os.getenv("MODEL_OPUS",   SONNET)
+# Haiku: ถูกกว่า Sonnet ~12x — ใช้กับงาน autonomous/background batch
+HAIKU  = os.getenv("MODEL_HAIKU",  "claude-haiku-4-5")
 
 # ── รุ่น default ต่อ agent (ตามคำแนะนำจาก review) ─────────────────
 # ตัวที่ตั้งเป็น OPUS = งานเน้นคิด/มีผลทางกฎหมาย-การเงิน/เป็นด่านคุณภาพ
@@ -39,7 +39,8 @@ AGENT_MODELS = {
     "sigma":  SONNET,   # Data Analyst — อัปเป็น OPUS ได้ถ้าวิเคราะห์เชิงลึก
     "lens":   SONNET,   # Creator — content/quiz
     "rex":    SONNET,   # Retail MD — sales analysis, branch performance
-    "scheduler": SONNET # งานอัตโนมัติ (Daily Brief ฯลฯ)
+    "scheduler": HAIKU,  # งาน batch/autonomous — ใช้ Haiku ประหยัด
+    "autonomous": HAIKU, # watch cycle — ถูกที่สุด
 }
 
 

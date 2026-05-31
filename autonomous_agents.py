@@ -42,9 +42,12 @@ WATCH_TIMEOUT_SECS = 90  # timeout per agent watch
 def consult_agent(from_agent: str, to_agent: str, question: str,
                   timeout: float = 60.0) -> str:
     """
-    Agent A ถาม Agent B แบบ synchronous — รอผลหรือ timeout
-    ใช้ bus.send() ถ้า agent register แล้ว, fallback เรียก direct ถ้าไม่มี
+    Agent consultation — ปิดด้วย env ENABLE_AGENT_CONSULT=1
+    Default: ปิด (ประหยัด API calls)
     """
+    import os
+    if not os.getenv("ENABLE_AGENT_CONSULT"):
+        return f"[consultation disabled — ประหยัด API]"
     log_agent(from_agent, to_agent, f"[consult] {question[:200]}")
 
     try:
@@ -115,11 +118,11 @@ def _direct_call_agent(agent_id: str, task: str) -> str:
 
 
 def _ask_claude(agent_id: str, system_prompt: str, user_content: str,
-                max_tokens: int = 1500) -> str:
-    """Helper: เรียก Claude ด้วย scheduler model — plain text, ลงท้ายครับ"""
+                max_tokens: int = 800) -> str:
+    """Helper: เรียก Claude ด้วย Haiku (autonomous = ประหยัด)"""
     try:
         resp = claude.messages.create(
-            model=get_model("scheduler"),
+            model=get_model("autonomous"),  # Haiku — ถูกกว่า 12x
             max_tokens=max_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": user_content}],
@@ -994,8 +997,30 @@ def synthesize_and_push(reports: list, user_id: str) -> str:
 # Watch cycle runner
 # ─────────────────────────────────────────────────────────────────────────────
 
-# registry ของ watch functions ทุกตัว (Rocket orchestrates, ไม่ watch)
-WATCH_FUNCTIONS = {
+# registry ของ watch functions
+# DEFAULT: เฉพาะ 4 ตัวสำคัญ (ประหยัด API)
+# เปิดเพิ่มได้โดยตั้ง env WATCH_AGENTS=coin,pulse,sage,people,pixel,sigma,rex,atlas,guard,lex,lens
+import os as _os
+_DEFAULT_WATCH = {"coin", "pulse", "sage", "people"}
+_ENABLED_WATCH = set(_os.getenv("WATCH_AGENTS", "coin,pulse,sage,people").split(","))
+
+WATCH_FUNCTIONS_ALL = {
+    "coin":   coin_watch,
+    "pulse":  pulse_watch,
+    "sage":   sage_watch,
+    "people": people_watch,
+    "pixel":  pixel_watch,
+    "sigma":  sigma_watch,
+    "rex":    rex_watch,
+    "atlas":  atlas_watch,
+    "guard":  guard_watch,
+    "lex":    lex_watch,
+    "lens":   lens_watch,
+}
+WATCH_FUNCTIONS = {k: v for k, v in WATCH_FUNCTIONS_ALL.items() if k in _ENABLED_WATCH}
+
+# (keep old key for compatibility)
+WATCH_FUNCTIONS_COMPAT = {
     "coin":   coin_watch,
     "pulse":  pulse_watch,
     "sage":   sage_watch,

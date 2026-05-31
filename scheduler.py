@@ -192,12 +192,12 @@ def consolidated_morning_report() -> str:
 
 # ── Activity digest config ────────────────────────────────────────
 # ส่งสรุปกิจกรรม agent ทุก X ชั่วโมง ถ้ามีการทำงานจริง
-ACTIVITY_DIGEST_HOURS = [11, 15, 19]   # 11:00, 15:00, 19:00
+ACTIVITY_DIGEST_HOURS = []  # ปิด — ประหยัด API (เปิดได้โดย env ACTIVITY_DIGEST=1)
 _last_activity_epoch = 0.0             # epoch ของ log ล่าสุดที่ส่งไปแล้ว
 
 # ── Autonomous watch cycle config ────────────────────────────────
 # รัน agent watch ทุก 4 ชั่วโมง (08:00 / 12:00 / 16:00 / 20:00) จ-ศ
-WATCH_HOURS = [8, 12, 16, 20]
+WATCH_HOURS = [12]   # รัน 1 ครั้ง/วัน (เดิม 4 ครั้ง) — ประหยัด 75%
 
 
 def build_activity_digest() -> str | None:
