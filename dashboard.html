@@ -156,42 +156,72 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
 .dtag{display:inline-block;background:var(--bg);border:1px solid #273a58;border-radius:3px;
   padding:2px 6px;font-size:9px;color:var(--cyan);margin:2px;font-family:'Share Tech Mono';}
 
-/* ── Org Chart Page ── */
-.org-wrap{flex:1;overflow:auto;padding:24px 16px;background:var(--bg);}
-.org-title{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;
-  color:var(--text2);letter-spacing:2px;text-transform:uppercase;
-  text-align:center;margin-bottom:24px;}
-/* Tree layout */
-.org-tree,.org-tree ul{list-style:none;padding:0;margin:0;
-  display:flex;justify-content:center;position:relative;}
-.org-tree ul{margin-top:0;padding-top:20px;}
-.org-tree li{display:flex;flex-direction:column;align-items:center;
-  position:relative;padding:0 8px;}
-/* Vertical connector down from card */
-.org-tree li::after{content:'';position:absolute;top:0;left:50%;
-  width:1px;height:20px;background:var(--border2);}
-/* Horizontal + vertical connector from parent to first/last child */
-.org-tree ul::before{content:'';position:absolute;top:0;left:50%;
-  width:1px;height:20px;background:var(--border2);}
-.org-tree li+li::before{content:'';position:absolute;top:0;right:50%;
-  left:-8px;height:1px;background:var(--border2);}
-.org-tree > li::after{display:none;}
-/* Node card */
-.org-node{background:var(--panel);border:1px solid var(--border);border-radius:8px;
-  padding:10px 14px;min-width:130px;max-width:180px;cursor:pointer;
-  position:relative;overflow:hidden;transition:.18s;text-align:center;
-  flex-shrink:0;}
-.org-node:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.4);}
-.org-node::before{content:'';position:absolute;top:0;left:0;right:0;
-  height:2px;background:var(--nc,#4f9eff);}
-.org-node.selected{border-color:var(--nc);box-shadow:0 0 0 1px var(--nc);}
-.org-em{font-size:22px;margin-bottom:4px;}
-.org-name{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:var(--nc,#fff);}
-.org-role{font-size:8px;color:var(--text3);margin-top:1px;letter-spacing:.3px;}
-.org-dot{position:absolute;top:7px;right:7px;width:5px;height:5px;
-  border-radius:50%;background:var(--green);box-shadow:0 0 4px var(--green);}
-/* Connector override for single-child */
-.org-tree ul.single::before{display:none;}
+/* ── Agents Page ── */
+.org-wrap{flex:1;overflow-y:auto;overflow-x:hidden;padding:28px 20px 80px;background:var(--bg);}
+/* Header */
+.org-hdr{text-align:center;margin-bottom:32px;}
+.org-hdr-title{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;
+  color:var(--blue);letter-spacing:4px;text-transform:uppercase;
+  text-shadow:0 0 20px rgba(79,158,255,.4);}
+.org-hdr-sub{font-size:11px;color:var(--text2);letter-spacing:2px;margin-top:4px;}
+.org-hdr-stats{font-size:10px;color:var(--text3);margin-top:6px;letter-spacing:1px;}
+/* Connector lines color */
+:root{--conn:#1e2a40;}
+/* Level containers */
+.org-level{display:flex;justify-content:center;position:relative;}
+/* Vertical connector below a card */
+.org-vline{width:1px;height:28px;background:var(--conn);margin:0 auto;}
+/* Row of 4 department columns */
+.org-cols{display:grid;grid-template-columns:repeat(4,1fr);gap:0 0;width:100%;max-width:1100px;margin:0 auto;position:relative;}
+/* Horizontal line spanning all 4 cols (drawn via border-top on a wrapper) */
+.org-hbar{position:relative;width:100%;max-width:1100px;margin:0 auto;height:28px;}
+.org-hbar::before{content:'';position:absolute;top:0;left:12.5%;right:12.5%;height:1px;background:var(--conn);}
+.org-hbar::after{display:none;}
+/* Vertical drops per column */
+.org-col{display:flex;flex-direction:column;align-items:center;padding:0 10px;}
+.org-col-vline{width:1px;height:28px;background:var(--conn);margin:0 auto;}
+/* Column department label pill */
+.org-col-label{background:#0f1520;border:1px solid #1e2a40;border-radius:12px;
+  padding:4px 14px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;
+  color:var(--text2);letter-spacing:1px;white-space:nowrap;margin-bottom:12px;}
+/* Agent card */
+.org-card{background:#0f1420;border-radius:10px;padding:12px 14px 10px;
+  cursor:pointer;transition:.18s;position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:10px;width:100%;max-width:220px;
+  margin-bottom:10px;}
+.org-card:hover{transform:translateY(-2px);filter:brightness(1.08);}
+/* Left avatar circle */
+.org-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;
+  flex-shrink:0;color:#fff;}
+/* Card text */
+.org-cinfo{flex:1;min-width:0;}
+.org-cname{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;line-height:1.1;}
+.org-crole{font-size:9px;color:var(--text2);margin-top:2px;}
+.org-cthai{font-size:8px;color:var(--text3);margin-top:3px;font-family:'Sarabun',sans-serif;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+/* Status dot on avatar */
+.org-sdot{position:absolute;bottom:2px;right:2px;width:7px;height:7px;
+  border-radius:50%;border:1.5px solid #0f1420;}
+/* Model badge (top-right) */
+.org-badge{position:absolute;top:7px;right:8px;font-family:'Rajdhani',sans-serif;
+  font-size:8px;font-weight:700;padding:2px 6px;border-radius:8px;letter-spacing:.5px;}
+.org-badge.sonnet{background:#142030;color:#7aafcf;border:1px solid #1e3a50;}
+.org-badge.opus{background:#2a1a00;color:#ffd166;border:1px solid #4a3010;}
+/* Boss card — full width, bigger */
+.org-card.boss{max-width:360px;padding:16px 18px 14px;border-width:1.5px !important;}
+.org-card.boss .org-avatar{width:52px;height:52px;font-size:24px;}
+.org-card.boss .org-cname{font-size:18px;}
+.org-card.boss .org-crole{font-size:10px;}
+/* Rocket card — centered, medium */
+.org-card.rocket-card{max-width:280px;}
+/* Footer legend bar */
+.org-footer{position:fixed;bottom:0;left:0;right:0;height:36px;
+  background:#0a0e1a;border-top:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:20px;z-index:100;
+  font-size:9px;color:var(--text3);}
+.org-footer-legend{display:flex;align-items:center;gap:8px;}
+.org-footer-auto{margin-left:auto;display:flex;align-items:center;gap:6px;}
 
 /* ── Console Page ── */
 .console-wrap{flex:1;display:flex;flex-direction:column;min-height:0;}
@@ -298,8 +328,28 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   <!-- PAGE: Agents -->
   <div class="page" id="pg-agents">
     <div class="org-wrap">
-      <div class="org-title">🏢 OWNDAYS L&D AI — Organizational Chart</div>
+      <!-- Header -->
+      <div class="org-hdr">
+        <div class="org-hdr-title">OWNDAYS AI OFFICE</div>
+        <div class="org-hdr-sub">ORG CHART — L&amp;D COMMAND CENTER • THAILAND</div>
+        <div class="org-hdr-stats">11 AI Agents &nbsp;•&nbsp; 73 Branches &nbsp;•&nbsp; 400+ Employees &nbsp;•&nbsp; 18 Trainers</div>
+      </div>
+      <!-- Chart rendered by buildOrgChart() -->
       <div id="org-chart"></div>
+    </div>
+    <!-- Fixed footer legend -->
+    <div class="org-footer">
+      <div class="org-footer-legend">
+        <span style="color:var(--text2);font-weight:700;letter-spacing:1px;">LEGEND</span>
+        <span class="org-badge sonnet" style="position:static;">SONNET</span>
+        <span style="color:var(--text3);">Claude Sonnet</span>
+        <span class="org-badge opus" style="position:static;">OPUS</span>
+        <span style="color:var(--text3);">Claude Opus</span>
+      </div>
+      <div class="org-footer-auto">
+        <span style="color:var(--text2);font-weight:700;letter-spacing:1px;">AUTO JOBS</span>
+        <span style="color:var(--text3);">08:00 Coin budget &nbsp;•&nbsp; 09:00 Sage report (จ+พฤ) / People probation (จันทร์) &nbsp;•&nbsp; 10:30 Rocket daily brief</span>
+      </div>
     </div>
   </div>
 
@@ -631,67 +681,133 @@ document.getElementById('sched-save').addEventListener('click', async () => {
    ORG CHART PAGE
    ═══════════════════════════════════════════════════ */
 
-// Hierarchy: Boss → Rocket → [Atlas (team lead), Rex (retail)]
-//   Atlas subtree: Pulse, Sage, Guard, Coin, Lex, People
-//   Rex subtree:   Pixel, Sigma, Lens
-const ORG_HIERARCHY = {
-  id: 'peanut',
-  children: [{
-    id: 'rocket',
-    children: [
-      {
-        id: 'atlas',
-        children: [
-          {id:'pulse'}, {id:'sage'}, {id:'guard'},
-          {id:'coin'}, {id:'lex'}, {id:'people'},
-        ]
-      },
-      {
-        id: 'rex',
-        children: [
-          {id:'pixel'}, {id:'sigma'}, {id:'lens'},
-        ]
-      }
-    ]
-  }]
-};
-
 const ALL_AGENTS_MAP = {};
 [BOSS, ...AGENTS].forEach(a => { ALL_AGENTS_MAP[a.id] = a; });
 
-function orgCard(id) {
+// Which agents use OPUS (all others = SONNET)
+const OPUS_AGENTS = new Set(['guard', 'lex']);
+
+// Thai description per agent
+const AGENT_THAI = {
+  peanut: 'Regional L&D Manager • OWNDAYS Thailand • Owner',
+  rocket: 'ศูนย์กลาง • รับคำสั่ง • แจกงาน • ความจำ',
+  atlas:  'วิเคราะห์ภาพรวม • ประสานงาน',
+  pulse:  'trainer KPI • หลักสูตร',
+  people: 'พนักงาน 400+ • probation',
+  sigma:  'trends • KPI • benchmark',
+  sage:   'รายงาน จ+พฤ อัตโนมัติ',
+  guard:  'ตรวจคุณภาพ • QA score',
+  coin:   'budget • forecast • ROI',
+  lex:    'แรงงาน • PDPA • สัญญา',
+  pixel:  'od-connect.com monitor',
+  lens:   'content • quiz • script',
+  rex:    'sales • สาขา • KPI',
+};
+
+function orgCard(id, extraClass) {
   const a = ALL_AGENTS_MAP[id];
   if (!a) return '';
   const st = agentStatus[id];
-  const busy = st && st.status === 'busy';
-  return `<div class="org-node" style="--nc:${a.color}"
+  const busy = st && (st.status === 'busy' || st.status === 'working');
+  const dotColor = busy ? 'var(--orange)' : 'var(--green)';
+  const dotShadow = busy ? 'var(--orange)' : 'var(--green)';
+  const isOpus = OPUS_AGENTS.has(id);
+  const badgeHtml = `<span class="org-badge ${isOpus ? 'opus' : 'sonnet'}">${isOpus ? 'OPUS' : 'SONNET'}</span>`;
+  const initial = a.name.charAt(0).toUpperCase();
+  // Avatar background: slightly darker than agent color
+  const avatarBg = a.color + '33'; // 20% opacity overlay for subtle bg
+  const thai = AGENT_THAI[id] || '';
+  const borderStyle = `border:1px solid ${a.color}; box-shadow:0 0 10px ${a.color}22;`;
+  return `<div class="org-card${extraClass ? ' ' + extraClass : ''}"
+    style="${borderStyle}"
     onclick="selectAgent('${id}');document.querySelectorAll('.ntab')[0].click();"
     title="${a.role}">
-    <div class="org-dot" style="background:${busy?'var(--orange)':'var(--green)'};box-shadow:0 0 5px ${busy?'var(--orange)':'var(--green)'};"></div>
-    <div class="org-em">${a.em}</div>
-    <div class="org-name">${a.name}</div>
-    <div class="org-role">${a.role}</div>
-    ${busy && st.current_task ? `<div style="font-size:8px;color:var(--orange);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${st.current_task.slice(0,24)}...</div>` : ''}
+    ${badgeHtml}
+    <div class="org-avatar" style="background:${a.color}22; border:1.5px solid ${a.color}55; color:${a.color};">
+      ${initial}
+      <span class="org-sdot" style="background:${dotColor}; box-shadow:0 0 5px ${dotShadow};"></span>
+    </div>
+    <div class="org-cinfo">
+      <div class="org-cname" style="color:${a.color};">${a.name}</div>
+      <div class="org-crole">${a.role}</div>
+      ${thai ? `<div class="org-cthai">${thai}</div>` : ''}
+    </div>
   </div>`;
-}
-
-function buildOrgTree(node) {
-  const children = node.children || [];
-  const isSingle = children.length === 1;
-  let h = `<li>${orgCard(node.id)}`;
-  if (children.length > 0) {
-    h += `<ul class="${isSingle?'single':''}">`;
-    children.forEach(c => { h += buildOrgTree(c); });
-    h += '</ul>';
-  }
-  h += '</li>';
-  return h;
 }
 
 function buildOrgChart() {
   const el = document.getElementById('org-chart');
   if (!el) return;
-  el.innerHTML = `<ul class="org-tree">${buildOrgTree(ORG_HIERARCHY)}</ul>`;
+
+  let h = '';
+
+  // ── Level 0: Peanut (full width) ──
+  h += `<div class="org-level">${orgCard('peanut', 'boss')}</div>`;
+
+  // Vertical line Peanut → Rocket
+  h += `<div class="org-vline"></div>`;
+
+  // ── Level 1: Rocket (centered) ──
+  h += `<div class="org-level">${orgCard('rocket', 'rocket-card')}</div>`;
+
+  // Vertical line Rocket → columns
+  h += `<div class="org-vline"></div>`;
+
+  // Horizontal bar with tick lines to 4 columns
+  // We build it as a flex row with pseudo-lines via CSS
+  h += `<div class="org-hbar"></div>`;
+
+  // ── Level 2: 4 department columns ──
+  const cols = [
+    {
+      label: 'กลยุทธ์ & ประสานงาน',
+      agents: [
+        {id: 'atlas'},
+      ]
+    },
+    {
+      label: 'ฝึกอบรม & บุคคล',
+      agents: [
+        {id: 'pulse'},
+        {id: 'people'},
+      ]
+    },
+    {
+      label: 'ข้อมูล & คุณภาพ',
+      agents: [
+        {id: 'sigma'},
+        {id: 'sage'},
+        {id: 'guard'},
+      ]
+    },
+    {
+      label: 'ปฏิบัติการ & สนับสนุน',
+      agents: [
+        {id: 'coin'},
+        {id: 'lex'},
+        {id: 'pixel'},
+        {id: 'lens'},
+        {id: 'rex'},
+      ]
+    },
+  ];
+
+  h += `<div class="org-cols">`;
+  cols.forEach(col => {
+    h += `<div class="org-col">`;
+    // vertical drop from hbar
+    h += `<div class="org-col-vline"></div>`;
+    // department label pill
+    h += `<div class="org-col-label">${col.label}</div>`;
+    // agent cards
+    col.agents.forEach(ag => {
+      h += orgCard(ag.id, '');
+    });
+    h += `</div>`;
+  });
+  h += `</div>`;
+
+  el.innerHTML = h;
 }
 
 /* ═══════════════════════════════════════════════════
