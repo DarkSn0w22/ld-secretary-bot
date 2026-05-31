@@ -340,7 +340,7 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   <div class="ntab" data-page="pg-agents">🤖 Agents</div>
   <div class="ntab" data-page="pg-console">💻 Console</div>
   <div class="ntab" data-page="pg-schedule">⏰ Schedule</div>
-  <div class="ntab" data-page="pg-jarvis" style="color:#22d3ee;" onclick="initJarvis()">🎙️ R.O.C.K.E.T</div>
+  <div class="ntab" data-page="pg-jarvis" style="color:#22d3ee;">🎙️ R.O.C.K.E.T</div>
 </div>
 
 <!-- ═══ PAGES ═══ -->
@@ -597,6 +597,7 @@ document.getElementById('nav').addEventListener('click', e => {
   if (tab.dataset.page === 'pg-office') resizeCanvas();
   if (tab.dataset.page === 'pg-schedule') loadSchedule();
   if (tab.dataset.page === 'pg-agents') buildOrgChart();
+  if (tab.dataset.page === 'pg-jarvis') setTimeout(initJarvis, 50); // init AFTER page visible
 });
 
 /* ═══════════════════════════════════════════════════
@@ -2000,40 +2001,80 @@ function toggleListening() {
 }
 
 function startListening() {
+  // ── Check browser support ──────────────────────────────────
   const SpeechRecog = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecog) {
-    jarvisSetResponse('Browser ไม่รองรับ SpeechRecognition ครับ (ใช้ Chrome)');
+    jarvisSetResponse('❌ ต้องใช้ Chrome ครับ — SpeechRecognition ไม่รองรับ browser นี้');
     return;
   }
-  // Start audio visualizer
-  startAudioViz();
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+    jarvisSetResponse('❌ ต้องเปิดผ่าน HTTPS ถึงจะใช้ไมค์ได้ครับ');
+    return;
+  }
 
-  jarvisRecog = new SpeechRecog();
-  jarvisRecog.lang = document.getElementById('jarvis-lang').value;
+  // ── Setup recognition ──────────────────────────────────────
+  try {
+    jarvisRecog = new SpeechRecog();
+  } catch(e) {
+    jarvisSetResponse('❌ สร้าง SpeechRecognition ไม่ได้: ' + e.message);
+    return;
+  }
+
+  const langEl = document.getElementById('jarvis-lang');
+  jarvisRecog.lang = langEl ? langEl.value : 'th-TH';
   jarvisRecog.continuous = false;
   jarvisRecog.interimResults = true;
+  jarvisRecog.maxAlternatives = 1;
 
   jarvisRecog.onstart = () => {
     jarvisListening = true;
-    jarvisSetStatus('LISTENING');
-    document.getElementById('jarvis-btn').classList.add('listening');
-    document.getElementById('jarvis-transcript').textContent = '...';
+    jarvisSetStatus('🎙️ LISTENING...');
+    const btn = document.getElementById('jarvis-btn');
+    if (btn) btn.classList.add('listening');
+    jarvisSetTranscript('กำลังฟัง...');
   };
+
   jarvisRecog.onresult = e => {
     let interim = '', final = '';
-    for (const r of e.results) {
-      if (r.isFinal) final += r[0].transcript;
-      else interim += r[0].transcript;
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
     }
-    document.getElementById('jarvis-transcript').textContent = final || interim || '...';
-    if (final) sendToRocket(final.trim());
+    jarvisSetTranscript(final || interim);
+    if (final.trim()) {
+      stopListening();
+      sendToRocket(final.trim());
+    }
   };
+
   jarvisRecog.onerror = e => {
-    jarvisSetStatus('ERROR: ' + e.error);
+    const msg = {
+      'not-allowed':   '❌ ไม่ได้รับอนุญาต — กรุณา Allow ไมค์ในเบราเซอร์',
+      'no-speech':     '🔇 ไม่ได้ยินเสียง ลองใหม่อีกครั้งครับ',
+      'network':       '🌐 Network error — ตรวจสอบอินเตอร์เน็ต',
+      'audio-capture': '🎤 ไม่พบไมค์ — ตรวจสอบอุปกรณ์',
+    }[e.error] || `❌ Error: ${e.error}`;
+    jarvisSetResponse(msg);
+    jarvisSetStatus('ERROR');
     stopListening();
   };
-  jarvisRecog.onend = () => stopListening();
-  jarvisRecog.start();
+
+  jarvisRecog.onend = () => {
+    if (jarvisListening) stopListening();
+  };
+
+  try {
+    jarvisRecog.start();
+    jarvisSetStatus('กำลังเปิดไมค์...');
+  } catch(e) {
+    jarvisSetResponse('❌ start() ไม่ได้: ' + e.message);
+    stopListening();
+  }
+}
+
+function jarvisSetTranscript(t) {
+  const el = document.getElementById('jarvis-transcript');
+  if (el) el.textContent = t || '—';
 }
 
 function stopListening() {
