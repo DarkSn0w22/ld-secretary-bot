@@ -629,377 +629,175 @@ function computeRooms() {
 
 function initSprites() {
   sprites = rooms.map((rm, i) => ({
-    x: rm.cx, y: rm.cy + rm.h * 0.15,
-    tx: rm.cx, ty: rm.cy + rm.h * 0.15,
+    x: rm.cx, y: rm.cy,
+    tx: rm.cx, ty: rm.cy,        // target position
     bobPhase: Math.random() * Math.PI * 2,
-    moveTimer: 80 + Math.random() * 160,
+    moveTimer: 60 + Math.random() * 120,
     busy: false,
-    msg: '', msgTimer: 0,
-    roomW: rm.w,  // for sprite scaling
+    msg: '',
+    msgTimer: 0,
   }));
 }
 
 // ── Draw helpers ──
 function drawFloor(rm) {
-  // Dark blue-gray floor (matches reference)
+  // Dark floor with subtle grid
+  ctx.fillStyle = '#0c1220';
+  // Dark blue-gray floor like reference
   ctx.fillStyle = '#1a2030';
-  ctx.fillRect(rm.x+1, rm.y+1, rm.w-2, rm.h-2);
-  // Subtle tile grid
-  ctx.strokeStyle = '#1e2840';
-  ctx.lineWidth = 0.5;
-  const gs = 16;
-  for (let gx = rm.x; gx <= rm.x+rm.w; gx += gs) {
-    ctx.beginPath(); ctx.moveTo(gx, rm.y+1); ctx.lineTo(gx, rm.y+rm.h-1); ctx.stroke();
+  ctx.fillRect(rm.x+2, rm.y+2, rm.w-4, rm.h-4);
+  // Tile grid
+  ctx.strokeStyle = '#1e2840'; ctx.lineWidth = 0.5;
+  const gs = 14;
+  for (let gx=rm.x+2; gx<rm.x+rm.w-2; gx+=gs) { ctx.beginPath(); ctx.moveTo(gx,rm.y+2); ctx.lineTo(gx,rm.y+rm.h-2); ctx.stroke(); }
+  for (let gy=rm.y+2; gy<rm.y+rm.h-2; gy+=gs) { ctx.beginPath(); ctx.moveTo(rm.x+2,gy); ctx.lineTo(rm.x+rm.w-2,gy); ctx.stroke(); }
+  // Thick wall border
+  ctx.fillStyle = '#2e3a4a';
+  ctx.fillRect(rm.x, rm.y, rm.w, 3); ctx.fillRect(rm.x, rm.y, 3, rm.h);
+  ctx.fillRect(rm.x+rm.w-3, rm.y, 3, rm.h); ctx.fillRect(rm.x, rm.y+rm.h-3, rm.w, 3);
+  // Colored nameplate strip (like reference)
+  if (rm.agent) {
+    ctx.fillStyle = rm.agent.color + '28';
+    ctx.fillRect(rm.x+3, rm.y+3, rm.w-6, 15);
+    ctx.fillStyle = rm.agent.color;
+    ctx.fillRect(rm.x+3, rm.y+3, 3, 15);
+    ctx.font = `bold 7px 'Rajdhani',sans-serif`;
+    ctx.fillStyle = rm.agent.color;
+    ctx.fillText(rm.agent.em + ' ' + rm.agent.name, rm.x+9, rm.y+12);
+    ctx.font = `6px 'Share Tech Mono',monospace`;
+    ctx.fillStyle = '#4a6a88';
+    ctx.fillText(rm.agent.role, rm.x+9, rm.y+20);
   }
-  for (let gy = rm.y; gy <= rm.y+rm.h; gy += gs) {
-    ctx.beginPath(); ctx.moveTo(rm.x+1, gy); ctx.lineTo(rm.x+rm.w-1, gy); ctx.stroke();
-  }
 }
 
-function drawWalls(rm) {
-  // Thick wall borders like reference
-  ctx.fillStyle = '#2a3040';  // wall color
-  const T = 3;  // wall thickness
-  ctx.fillRect(rm.x, rm.y, rm.w, T);          // top
-  ctx.fillRect(rm.x, rm.y, T, rm.h);          // left
-  ctx.fillRect(rm.x+rm.w-T, rm.y, T, rm.h);  // right
-  ctx.fillRect(rm.x, rm.y+rm.h-T, rm.w, T);  // bottom
-  // Inner wall highlight (top edge)
-  ctx.fillStyle = '#3a4458';
-  ctx.fillRect(rm.x+T, rm.y+T, rm.w-T*2, 1);
-}
-
-function drawRoomLabel(rm) {
-  if (!rm.agent) return;
-  const a = rm.agent;
-  const LH = 16;
-  // Colored nameplate at top of room
-  ctx.fillStyle = a.color + '22';
-  ctx.fillRect(rm.x+3, rm.y+3, rm.w-6, LH);
-  ctx.fillStyle = a.color;
-  ctx.fillRect(rm.x+3, rm.y+3, 3, LH);  // accent bar
-  ctx.font = `bold 8px 'Rajdhani', sans-serif`;
-  ctx.fillStyle = a.color;
-  ctx.textAlign = 'left';
-  ctx.fillText(a.em + ' ' + a.name, rm.x+9, rm.y+3+LH*0.65);
-  ctx.font = `7px 'Share Tech Mono', monospace`;
-  ctx.fillStyle = '#4a5a70';
-  ctx.fillText(a.role, rm.x+9, rm.y+3+LH*0.65+8);
-  ctx.textAlign = 'start';
-}
-
-function drawDesk(rm) {
-  const cx = rm.cx, cy = rm.cy;
-  const roomW = rm.w;
-  const dw = Math.min(roomW * 0.6, 70);
-  const dh = 13;
-
-  // Chair (behind desk)
-  ctx.fillStyle = '#1a1a28';
-  ctx.fillRect(cx-6, cy+dh/2+2, 12, 8);
-  ctx.fillStyle = '#22223a';
-  ctx.fillRect(cx-7, cy+dh/2, 14, 4);
-
-  // Desk surface (top face)
-  ctx.fillStyle = '#3d2a1a';
-  ctx.fillRect(cx-dw/2, cy-dh/2, dw, dh);
-  ctx.fillStyle = '#5a3a22';  // top highlight
-  ctx.fillRect(cx-dw/2, cy-dh/2, dw, 4);
-
-  // Desk front edge
-  ctx.fillStyle = '#2a1a0a';
-  ctx.fillRect(cx-dw/2, cy+dh/2-2, dw, 3);
-
-  // Monitors (dual screen like reference)
-  const mon = (mx) => {
-    const mw=13, mh=10;
-    ctx.fillStyle = '#0e1620';
-    ctx.fillRect(mx-mw/2, cy-dh/2-mh-2, mw, mh);
-    ctx.fillStyle = '#1a4060';  // screen blue glow
-    ctx.fillRect(mx-mw/2+1, cy-dh/2-mh-1, mw-2, mh-2);
-    // Screen content lines
-    ctx.fillStyle = '#2a6090';
-    for(let i=0;i<3;i++) ctx.fillRect(mx-mw/2+2, cy-dh/2-mh+1+i*2.5, mw-5, 1);
-    // Stand
-    ctx.fillStyle = '#222';
-    ctx.fillRect(mx-1, cy-dh/2-2, 3, 3);
+function drawDesk(cx, cy, w) {
+  const dw = Math.min(w*0.55, 60), dh = 12;
+  // Chair behind desk
+  ctx.fillStyle = '#14141e'; ctx.fillRect(cx-6, cy+dh/2+2, 12, 7);
+  ctx.fillStyle = '#1e1e2e'; ctx.fillRect(cx-7, cy+dh/2, 14, 4);
+  // Desk body (brown wood)
+  ctx.fillStyle = '#2a1a10'; ctx.fillRect(cx-dw/2, cy-dh/2, dw, dh);
+  ctx.fillStyle = '#3a2418'; ctx.fillRect(cx-dw/2, cy-dh/2, dw, 4); // top
+  ctx.fillStyle = '#1a0e08'; ctx.fillRect(cx-dw/2, cy+dh/2-3, dw, 3); // front
+  // Dual monitors
+  const mon = (mx, glow) => {
+    ctx.fillStyle='#0e1620'; ctx.fillRect(mx-6,cy-dh/2-11,12,9);
+    ctx.fillStyle=glow; ctx.fillRect(mx-5,cy-dh/2-10,10,7);
+    for(let i=0;i<3;i++){ctx.fillStyle='rgba(100,180,255,0.3)';ctx.fillRect(mx-4,cy-dh/2-9+i*2,8,1);}
+    ctx.fillStyle='#222'; ctx.fillRect(mx-1,cy-dh/2-2,3,2);
   };
-  if (dw > 50) {
-    mon(cx - dw/4);
-    mon(cx + dw/4);
-  } else {
-    mon(cx);
-  }
-
+  if (dw>40) { mon(cx-dw/4,'#1a4060'); mon(cx+dw/4,'#0e2840'); }
+  else        { mon(cx,'#1a3a58'); }
   // Keyboard
-  ctx.fillStyle = '#222230';
-  ctx.fillRect(cx-dw/2+4, cy-dh/2+6, dw-8, 4);
+  ctx.fillStyle='#1e2030'; ctx.fillRect(cx-dw/2+4, cy-dh/2+5, dw-8, 4);
 }
 
-function drawPlant(x, y, small) {
-  const s = small ? 0.7 : 1;
+function drawChair(cx, cy) {
+  // already drawn inside drawDesk
+}
+
+function drawPlant(x, y) {
+  // Pot
   ctx.fillStyle = '#4a3020';
-  ctx.fillRect(x-3*s, y, 6*s, 6*s);
-  ctx.fillStyle = '#0a5a1a';
-  ctx.beginPath(); ctx.arc(x, y-1, 6*s, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#1a7a2a';
-  ctx.beginPath(); ctx.arc(x-3*s, y-3*s, 4*s, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x+3*s, y-4*s, 3.5*s, 0, Math.PI*2); ctx.fill();
+  ctx.fillRect(x - 4, y, 8, 7);
+  // Leaves
+  ctx.fillStyle = '#1a6a2a';
+  ctx.beginPath(); ctx.arc(x, y - 2, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2a8a3a';
+  ctx.beginPath(); ctx.arc(x - 3, y - 4, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 3, y - 5, 3.5, 0, Math.PI * 2); ctx.fill();
 }
 
-function drawBookshelf(x, y, w, h) {
+function drawBookshelf(x, y) {
   ctx.fillStyle = '#2a1f14';
-  ctx.fillRect(x, y, w||14, h||18);
-  ctx.fillStyle = '#3a2a18';
-  ctx.fillRect(x, y, w||14, 2);  // top
-  const cols = ['#3a4a6a','#6a3a3a','#3a6a3a','#5a5a3a','#6a4a2a','#2a4a6a'];
-  const bw = ((w||14)-2) / 5;
-  for (let i=0;i<5;i++) {
-    ctx.fillStyle = cols[i%cols.length];
-    ctx.fillRect(x+1+i*bw, y+3, bw-0.5, (h||18)-4);
-    ctx.fillStyle = cols[(i+3)%cols.length];
-    ctx.fillRect(x+1+i*bw, y+(h||18)/2, bw-0.5, (h||18)/2-3);
+  ctx.fillRect(x, y, 12, 18);
+  // Books
+  const colors = ['#3a4a6a','#6a3a3a','#3a6a3a','#5a5a3a'];
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(x + 1 + i * 2.5, y + 1, 2, 7);
+  }
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = colors[i + 1];
+    ctx.fillRect(x + 1 + i * 3.5, y + 10, 3, 7);
   }
 }
 
-function drawWhiteboard(x, y, w, h) {
-  ctx.fillStyle = '#dde8ee';
-  ctx.fillRect(x, y, w||20, h||14);
-  ctx.strokeStyle = '#7a9aaa';
-  ctx.lineWidth = 0.5;
-  ctx.strokeRect(x, y, w||20, h||14);
-  // Chart lines
-  ctx.strokeStyle = '#4a7a9a';
-  ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(x+3, y+10); ctx.lineTo(x+3, y+3); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x+3, y+10); ctx.lineTo(x+(w||20)-3, y+10); ctx.stroke();
-  // Bar chart
-  const bars = [5,8,4,7,6];
-  bars.forEach((b,i) => {
-    ctx.fillStyle = '#4a8aca';
-    ctx.fillRect(x+4+i*3, y+10-b, 2, b);
-  });
-}
+// ── Draw chibi character ──
+function lighten(hex) { try { const h=hex.replace('#',''); return '#'+[0,2,4].map(i=>{const v=Math.min(255,parseInt(h.slice(i,i+2),16)+35);return v.toString(16).padStart(2,'0');}).join(''); } catch(e){return hex;} }
+function darken(hex)  { try { const h=hex.replace('#',''); return '#'+[0,2,4].map(i=>{const v=Math.max(0,parseInt(h.slice(i,i+2),16)-30);return v.toString(16).padStart(2,'0');}).join(''); } catch(e){return hex;} }
 
-// ── Pokemon GBA-style character ──
-// Drawn on pixel grid: each "virtual pixel" = S display pixels
+// Pokemon GBA–style pixel sprite (reliable, no shadeCol dependency)
 function drawCharacter(x, y, agent, spr, isBoss) {
-  const S = Math.max(1.5, Math.min(2.5, spr.roomW ? spr.roomW / 50 : 2));
-  const bob = Math.round(Math.sin(spr.bobPhase) * (spr.busy ? 1 : 0.5));
-  const cx = Math.round(x);
-  const cy = Math.round(y + bob);
+  const S = 2;   // pixel size: each "pixel" = 2px
+  const bob = Math.sin(spr.bobPhase) * (spr.busy ? 1.2 : 0.6);
+  const px = Math.round(x);
+  const py = Math.round(y + bob);
 
-  // ── Pixel grid helper ──
-  const P = (col, row, w, h, color) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(cx + col*S, cy + row*S, w*S, h*S);
-  };
+  // feet at (px, py), sprite 16px wide × 24px tall at 2× = 32×48
+  const ox = px - 8*S;
+  const oy = py - 24*S;
+  const f = (c,r,w,h,col) => { ctx.fillStyle=col; ctx.fillRect(ox+c*S, oy+r*S, w*S, h*S); };
 
-  // Origin: center of feet = (cx, cy+12*S)
-  // Character is 16 cols wide, 24 rows tall
-  const OX = -8;  // col offset from cx
-  const OY = -24; // row offset from cy (feet at row 24)
-
-  const pp = (col, row, w, h, color) => P(OX+col, OY+row, w, h, color);
-
-  const skin = '#e8c8a0';
-  const hair = agent.hairCol || '#2a1a0a';
-  const body = agent.bodyCol || '#1a3a7a';
-  const dark = '#14141e';
-  const shoeC = '#1a1828';
-  const isBoss2 = isBoss; // alias
-
-  // Glow aura if busy
+  // Busy glow
   if (spr.busy) {
     ctx.save();
-    ctx.globalAlpha = 0.12 + Math.sin(spr.bobPhase*1.5)*0.06;
+    ctx.globalAlpha = 0.12 + Math.abs(Math.sin(spr.bobPhase)) * 0.08;
     ctx.fillStyle = agent.color;
     ctx.beginPath();
-    ctx.arc(cx, cy+(OY+12)*S, 14*S, 0, Math.PI*2);
+    ctx.arc(px, oy + 12*S, 14*S, 0, Math.PI*2);
     ctx.fill();
     ctx.restore();
   }
 
-  // ─ SHOES (row 22-23) ─
-  pp(2,22, 5,2, shoeC);
-  pp(9,22, 5,2, shoeC);
-
-  // ─ LEGS (row 18-22) ─
-  const pantsC = '#1e1e30';
-  pp(3,18, 4,5, pantsC);
-  pp(9,18, 4,5, pantsC);
-  // leg crease
-  pp(4,20, 2,1, '#2a2a40');
-  pp(10,20, 2,1, '#2a2a40');
-
-  // ─ BODY (rows 10-18) ─
-  // Main body
-  pp(2,10, 12,8, body);
-  // Body shading
-  pp(2,10, 12,2, shadeCol(body,30));   // top highlight
-  pp(2,16, 12,2, shadeCol(body,-20));  // bottom shadow
-  // Collar / shirt detail
-  pp(6,10, 4,3, shadeCol(body,15));
-  // Belt
-  pp(2,17, 12,1, shadeCol(body,-30));
-  pp(5,17, 3,1, '#3a3a4a');  // belt buckle
-
-  // ─ ARMS (rows 11-16) ─
-  pp(0,11, 2,6, body);   // left arm
-  pp(14,11, 2,6, body);  // right arm
-  pp(0,16, 3,2, skin);   // left hand
-  pp(13,16, 3,2, skin);  // right hand
-  // Arm shading
-  pp(0,11, 1,6, shadeCol(body,-10));
-  pp(15,11, 1,6, shadeCol(body,-10));
-
-  // ─ NECK (rows 9-10) ─
-  pp(6,9, 4,2, skin);
-
-  // ─ HEAD (rows 3-9) ─
-  pp(3,3, 10,7, skin);
-  // Head shading
-  pp(3,3, 10,1, shadeCol(skin,10));
-  pp(3,9, 10,1, shadeCol(skin,-10));
-
-  // ─ EARS (rows 5-6) ─
-  pp(2,5, 2,2, shadeCol(skin,-5));
-  pp(12,5, 2,2, shadeCol(skin,-5));
-
-  // ─ EYES (row 5-7) ─
-  pp(5,5, 2,2, dark);
-  pp(9,5, 2,2, dark);
-  // Eye highlights
-  pp(5,5, 1,1, '#e8e8ff');
-  pp(9,5, 1,1, '#e8e8ff');
-  // Pupils
-  pp(6,6, 1,1, agent.color || '#4f9eff');
-  pp(10,6, 1,1, agent.color || '#4f9eff');
-
-  // ─ EYEBROWS (row 4) ─
-  pp(5,4, 2,1, shadeCol(hair,-10));
-  pp(9,4, 2,1, shadeCol(hair,-10));
-
-  // ─ NOSE (row 7) ─
-  pp(7,7, 2,1, shadeCol(skin,-20));
-
-  // ─ MOUTH (row 8) ─
-  pp(6,8, 4,1, '#c08060');
-  pp(7,8, 2,1, '#a06050');  // lip center
-
-  // ─ HAIR (rows 0-4) ─
-  // Top hair
-  pp(4,0, 8,1, hair);
-  pp(3,1, 10,3, hair);
-  // Side hair
-  pp(2,2, 2,5, hair);
-  pp(12,2, 2,5, hair);
-  // Hair shading
-  pp(3,1, 10,1, shadeCol(hair,20));  // highlight
-
-  // Boss crown
-  if (isBoss2) {
-    const crownC = '#ffd166';
-    pp(4,-3, 8,1, crownC);
-    pp(3,-2, 10,3, crownC);
-    pp(4,-4, 2,2, crownC);
-    pp(7,-5, 2,2, crownC);
-    pp(10,-4, 2,2, crownC);
-    // Crown jewels
-    pp(4,-4, 2,2, '#ff6b6b');
-    pp(7,-5, 2,2, '#3ddc84');
-    pp(10,-4, 2,2, '#4f9eff');
-  }
-
-  // ─ Name pill ─
-  const name = isBoss2 ? '👑 ' + agent.name : agent.name;
-  ctx.font = `bold ${Math.round(7*S/2)}px 'Rajdhani', sans-serif`;
-  const tw = ctx.measureText(name).width;
-  const pH = 12, pW = tw + 10;
-  const pX = cx - pW/2, pY = cy + (OY-4)*S - pH;
-  ctx.fillStyle = 'rgba(10,14,26,.9)';
-  roundRect(ctx, pX, pY, pW, pH, 3); ctx.fill();
-  ctx.fillStyle = agent.color;
-  ctx.fillRect(pX, pY, 3, pH);
-  ctx.fillStyle = '#d0e8ff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(name, cx, pY + pH/2);
-  ctx.textBaseline = 'alphabetic';
-
-  // Glow if busy
-  if (spr.busy) {
-    ctx.save();
-    ctx.globalAlpha = 0.15 + Math.sin(spr.bobPhase * 2) * 0.08;
-    ctx.fillStyle = agent.color;
-    ctx.beginPath();
-    ctx.arc(px, py - 8 * scale, 18 * scale, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
+  // Shoes
+  f(2,22,5,2,'#18182a'); f(9,22,5,2,'#18182a');
   // Legs
-  ctx.fillStyle = '#1a1a24';
-  ctx.fillRect(px - 4 * scale, py + 4 * scale, 3 * scale, 6 * scale);
-  ctx.fillRect(px + 1 * scale, py + 4 * scale, 3 * scale, 6 * scale);
-
+  f(3,18,4,5,'#1e1e30'); f(9,18,4,5,'#1e1e30');
+  // Belt
+  f(2,17,12,1,'#333350');
   // Body
-  ctx.fillStyle = agent.bodyCol;
-  const bw = 10 * scale, bh = 10 * scale;
-  ctx.fillRect(px - bw/2, py - bh/2, bw, bh);
-
-  // Head (skin)
-  const headR = 7 * scale;
-  ctx.fillStyle = '#e8c89a';
-  ctx.beginPath();
-  ctx.arc(px, py - 12 * scale, headR, 0, Math.PI * 2);
-  ctx.fill();
-
+  f(2,10,12,7, agent.bodyCol||'#1a3a7a');
+  // Body highlight (top edge)
+  f(2,10,12,1, lighten(agent.bodyCol||'#1a3a7a'));
+  // Arms
+  f(0,11,2,6, agent.bodyCol||'#1a3a7a'); f(14,11,2,6, agent.bodyCol||'#1a3a7a');
+  // Hands
+  f(0,16,2,2,'#e8c890'); f(14,16,2,2,'#e8c890');
+  // Neck
+  f(6,9,4,2,'#e8c890');
+  // Head
+  f(3,3,10,7,'#e8c890');
   // Hair
-  ctx.fillStyle = agent.hairCol;
-  ctx.beginPath();
-  ctx.arc(px, py - 15 * scale, headR * 0.9, Math.PI, 0);
-  ctx.fill();
-  // Side hair
-  ctx.fillRect(px - headR * 0.8, py - 16 * scale, 3 * scale, 6 * scale);
-  ctx.fillRect(px + headR * 0.8 - 3 * scale, py - 16 * scale, 3 * scale, 6 * scale);
-
+  f(3,0,10,5, agent.hairCol||'#3a2a1a');
+  f(2,2,2,5,  agent.hairCol||'#3a2a1a');
+  f(12,2,2,5, agent.hairCol||'#3a2a1a');
   // Eyes
-  ctx.fillStyle = '#1a1a2a';
-  ctx.fillRect(px - 3 * scale, py - 13 * scale, 2 * scale, 2 * scale);
-  ctx.fillRect(px + 1 * scale, py - 13 * scale, 2 * scale, 2 * scale);
-
+  f(5,5,2,2,'#14141e'); f(9,5,2,2,'#14141e');
+  f(5,5,1,1,'#d0d8ff'); f(9,5,1,1,'#d0d8ff');  // highlight
+  // Eye color dot
+  f(6,6,1,1, agent.color||'#4f9eff'); f(10,6,1,1, agent.color||'#4f9eff');
+  // Eyebrows
+  f(5,4,2,1, darken(agent.hairCol||'#3a2a1a'));
+  f(9,4,2,1, darken(agent.hairCol||'#3a2a1a'));
   // Mouth
-  ctx.fillStyle = '#c08060';
-  ctx.fillRect(px - 1 * scale, py - 10 * scale, 2 * scale, 1 * scale);
+  f(6,8,4,1,'#c08060'); f(7,8,2,1,'#a06040');
 
-  // Boss crown
+  // Boss crown (3-point pixel crown)
   if (isBoss) {
-    ctx.fillStyle = '#ffd166';
-    ctx.beginPath();
-    ctx.moveTo(px - 6, py - 24);
-    ctx.lineTo(px - 4, py - 20);
-    ctx.lineTo(px - 1, py - 23);
-    ctx.lineTo(px + 2, py - 20);
-    ctx.lineTo(px + 4, py - 23);
-    ctx.lineTo(px + 6, py - 20);
-    ctx.lineTo(px + 8, py - 24);
-    ctx.lineTo(px + 8, py - 20);
-    ctx.lineTo(px - 6, py - 20);
-    ctx.closePath();
-    ctx.fill();
-    // Crown jewel
-    ctx.fillStyle = '#ff5c5c';
-    ctx.fillRect(px - 1, py - 23, 2, 2);
+    const c = '#ffd166';
+    f(4,0,8,1,c); f(3,1,10,2,c);
+    f(4,-1,2,2,c); f(7,-2,2,2,c); f(10,-1,2,2,c);
+    f(5,-1,1,1,'#ff6b6b'); f(7,-2,1,1,'#3ddc84'); f(10,-1,1,1,'#4f9eff');
   }
 
   // Name pill
-  ctx.font = `${9 * scale}px Rajdhani, sans-serif`;
-  const name = agent.name;
+  ctx.font = `bold 8px 'Rajdhani', sans-serif`;
+  const name = isBoss ? '👑 ' + agent.name : agent.name;
   const tw = ctx.measureText(name).width;
   const pillW = tw + 10;
-  const pillH = 13 * scale;
-  const pillY = py - 27 * scale - (isBoss ? 8 : 0);
+  const pillH = 12;
+  const pillY = oy - pillH - 2;
   // Pill bg
   ctx.fillStyle = 'rgba(255,255,255,0.92)';
   roundRect(ctx, px - pillW/2, pillY, pillW, pillH, 3);
@@ -1046,17 +844,6 @@ function drawCharacter(x, y, agent, spr, isBoss) {
   ctx.textBaseline = 'alphabetic';
 }
 
-// Shade color lighter(+) or darker(-) by amt
-function shadeCol(hex, amt) {
-  try {
-    const h = hex.replace('#','');
-    const r = Math.max(0,Math.min(255, parseInt(h.slice(0,2),16)+amt));
-    const g = Math.max(0,Math.min(255, parseInt(h.slice(2,4),16)+amt));
-    const b = Math.max(0,Math.min(255, parseInt(h.slice(4,6),16)+amt));
-    return `rgb(${r},${g},${b})`;
-  } catch(e) { return hex; }
-}
-
 function roundRect(c, x, y, w, h, r) {
   c.beginPath();
   c.moveTo(x + r, y);
@@ -1077,7 +864,7 @@ function updateSprites(dt) {
     const rm = rooms[i];
     if (!rm) return;
     // Bob animation
-    spr.bobPhase += dt * (spr.busy ? 0.12 : 0.045); // slow gentle bob
+    spr.bobPhase += dt * (spr.busy ? 0.08 : 0.03); // slow bob
     // Message timer
     if (spr.msgTimer > 0) spr.msgTimer -= dt;
     // Movement timer
@@ -1118,45 +905,45 @@ function updateSprites(dt) {
 // ── Main render ──
 function drawOffice() {
   ctx.clearRect(0, 0, W, H);
-  // Office background
-  ctx.fillStyle = '#10141e';
+  // Background
+  ctx.fillStyle = '#080c18';
   ctx.fillRect(0, 0, W, H);
 
-  // ── Banner (matches reference: dark blue panel, gold text) ──
-  const banH = 30;
+  // Banner (matches reference: dark panel + gold title + subtitle)
   ctx.fillStyle = '#0c1228';
-  ctx.fillRect(0, 0, W, banH);
-  ctx.fillStyle = '#1a3060';
-  ctx.fillRect(0, banH-2, W, 2);
+  ctx.fillRect(0, 0, W, 30);
+  ctx.fillStyle = '#1a3060'; ctx.fillRect(0, 28, W, 2);
   ctx.textAlign = 'center';
-  ctx.font = `bold 13px 'Rajdhani', sans-serif`;
+  ctx.font = `bold 14px 'Rajdhani',sans-serif`;
   ctx.fillStyle = '#c8a84a';
   ctx.fillText('L&D Legacy Office', W/2, 13);
-  ctx.font = `9px 'Share Tech Mono', monospace`;
-  ctx.fillStyle = '#4a6a9a';
+  ctx.font = `8px 'Share Tech Mono',monospace`;
+  ctx.fillStyle = '#4a6a8a';
   ctx.fillText('OWNDAYS AI CREW', W/2, 25);
   ctx.textAlign = 'start';
 
-  // ── Draw rooms ──
-  ctx.imageSmoothingEnabled = false;
+  // Draw rooms
   rooms.forEach((rm, i) => {
     drawFloor(rm);
-    // Furniture (deterministic per role index)
-    const rmod4 = i % 4, rmod3 = i % 3;
-    // Bookshelf top-right corner
-    if (rmod3 !== 1) drawBookshelf(rm.x+rm.w-17, rm.y+20, 14, Math.min(20, rm.h*0.35));
-    // Plant bottom-left
-    if (rmod4 !== 2) drawPlant(rm.x+10, rm.y+rm.h-16, rm.w < 100);
-    // Whiteboard on wall
-    if (rmod3 === 2) drawWhiteboard(rm.x+rm.w-26, rm.y+20, 20, 13);
-    // Second plant
-    if (rmod4 === 0 && rm.w > 90) drawPlant(rm.x+rm.w-24, rm.y+rm.h-14, true);
-    // Desk + chair
-    drawDesk(rm);
-    // Walls last (drawn over floor edges)
-    drawWalls(rm);
-    // Room label (top strip)
-    drawRoomLabel(rm);
+    drawDesk(rm.cx, rm.cy, rm.w);
+    drawChair(rm.cx, rm.cy);
+    // Decorations (deterministic per room)
+    if (i % 3 === 0) drawPlant(rm.x + 16, rm.y + rm.h - 18);
+    if (i % 4 === 1) drawBookshelf(rm.x + rm.w - 20, rm.y + 8);
+    if (i % 5 === 2) {
+      // Whiteboard
+      ctx.fillStyle = '#e8e8e8';
+      ctx.fillRect(rm.x + rm.w - 28, rm.y + 6, 18, 12);
+      ctx.strokeStyle = '#aaa';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(rm.x + rm.w - 28, rm.y + 6, 18, 12);
+    }
+    // Room label
+    if (rm.agent) {
+      ctx.font = '8px Share Tech Mono, monospace';
+      ctx.fillStyle = '#2a3a50';
+      ctx.fillText(rm.agent.em + ' ' + rm.agent.name, rm.x + 5, rm.y + rm.h - 5);
+    }
   });
 
   // Draw characters on top
