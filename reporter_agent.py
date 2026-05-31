@@ -90,6 +90,21 @@ def run_reporter(task: str = "weekly") -> str:
     report = generate_report(data, task)
 
     print(f"Sage report generated ({len(report)} chars)")
+
+    # บันทึกรายงานลง Google Drive
+    try:
+        from drive_api import save_text_report, drive_ready
+        from datetime import datetime
+        import pytz
+        if drive_ready() and len(report) > 100:
+            now = datetime.now(pytz.timezone("Asia/Bangkok"))
+            fname = f"Sage_{task}_Report_{now.strftime('%Y%m%d_%H%M')}.txt"
+            res = save_text_report("sage", fname, report)
+            if res.get("ok"):
+                report += f"\n\n📁 บันทึกใน Google Drive แล้วครับ\n🔗 {res['url']}"
+    except Exception:
+        pass
+
     return report
 
 

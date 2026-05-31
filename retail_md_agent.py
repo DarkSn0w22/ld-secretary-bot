@@ -378,7 +378,23 @@ def run_retail_md(task: str, context: str = "", sales_file_content: str = "") ->
             for block in response.content:
                 if hasattr(block, "text"):
                     final_text += block.text
-            return final_text.strip() or "Rex ประมวลผลเสร็จแล้วครับ"
+            result_text = final_text.strip() or "Rex ประมวลผลเสร็จแล้วครับ"
+
+            # บันทึกรายงานลง Google Drive (ถ้าพร้อม)
+            try:
+                from drive_api import save_text_report, drive_ready
+                from datetime import datetime
+                import pytz
+                if drive_ready() and len(result_text) > 100:
+                    now = datetime.now(pytz.timezone("Asia/Bangkok"))
+                    fname = f"Rex_Sales_Report_{now.strftime('%Y%m%d_%H%M')}.txt"
+                    res = save_text_report("rex", fname, result_text)
+                    if res.get("ok"):
+                        result_text += f"\n\n📁 บันทึกใน Google Drive แล้วครับ\n🔗 {res['url']}"
+            except Exception:
+                pass
+
+            return result_text
 
         return "Rex ทำงานเสร็จสิ้นครับ"
 
