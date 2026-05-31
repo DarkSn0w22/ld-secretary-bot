@@ -843,6 +843,20 @@ def _start_agent_bus():
     bus.register("rex",    run_retail_md)
     print(f"[Bus] {bus.online_count()} agents online ✓")
 
+@app.route("/api/setup-richmenu", methods=["POST"])
+def api_setup_richmenu():
+    """ตั้งค่า LINE Rich Menu — trigger จาก Dashboard"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from setup_richmenu import setup_richmenu
+        result = setup_richmenu()
+        log_agent("dashboard", "system", "setup rich menu", str(result))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 _start_agent_bus()
 start_scheduler()
 start_autonomous_watchers()
