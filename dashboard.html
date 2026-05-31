@@ -285,6 +285,156 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   border-radius:3px;padding:4px 6px;color:var(--text);font-family:'Share Tech Mono';font-size:10px;outline:none;}
 .sched-table input:focus,.sched-table select:focus{border-color:var(--blue);}
 .sched-actions{margin-top:12px;display:flex;gap:8px;}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE  ≤768px
+   ══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* ── Header: compact ── */
+  .hdr{padding:5px 10px;flex-wrap:nowrap;gap:6px;}
+  .logo-t{font-size:11px;letter-spacing:1px;}
+  .logo-s{display:none;}
+  .logo-px{width:26px;height:26px;font-size:14px;}
+  /* hide stats on mobile */
+  .hstats .hs{display:none;}
+  /* hide all header shortcut buttons — access via mobile menu */
+  .hstats > div[style*="display:flex"]{display:none !important;}
+  .hstats > button{display:none !important;}
+  /* keep clock */
+  #clk{font-size:11px;}
+  #datex{font-size:7px;}
+
+  /* mobile hamburger reveals them */
+  #mob-menu-btn{display:flex !important;}
+
+  /* ── Nav: scrollable strip ── */
+  .nav{
+    padding:4px 8px 0;gap:1px;
+    overflow-x:auto;overflow-y:hidden;
+    scrollbar-width:none;-ms-overflow-style:none;
+  }
+  .nav::-webkit-scrollbar{display:none;}
+  .ntab{padding:5px 10px;font-size:11px;white-space:nowrap;}
+
+  /* ── Office layout: single column, panels as drawers ── */
+  .layout{grid-template-columns:1fr !important;}
+
+  /* Left panel → fixed slide-in drawer from left */
+  .lpanel{
+    position:fixed !important;
+    left:-240px;top:0;bottom:0;width:240px;z-index:200;
+    transition:left .22s cubic-bezier(.4,0,.2,1);
+    box-shadow:4px 0 24px rgba(0,0,0,.6);
+  }
+  .lpanel.mob-open{left:0 !important;}
+
+  /* Right panel → fixed bottom sheet */
+  .rpanel{
+    position:fixed !important;
+    left:0;right:0;bottom:0;
+    width:100% !important;min-width:0 !important;
+    height:60vh;
+    border-left:none !important;
+    border-top:2px solid #1a3060;
+    border-radius:14px 14px 0 0;
+    transform:translateY(100%);
+    z-index:200;
+    transition:transform .22s cubic-bezier(.4,0,.2,1);
+  }
+  .rpanel.mob-open{transform:translateY(0) !important;}
+  /* hide the rpanel desktop toggle text inside ph */
+  #rpanel-toggle{display:none;}
+
+  /* cpanel fills all space */
+  .cpanel{min-height:0;}
+
+  /* ── Floating action bar (mobile only) ── */
+  #mob-fab{display:flex !important;}
+
+  /* ── Console: full width inputs ── */
+  .console-cmd{flex-wrap:wrap;gap:5px;}
+  .console-cmd .csel{max-width:100%;width:100%;}
+  .console-cmd .cinput{width:100%;}
+  .console-cmd .cbtn{width:100%;}
+
+  /* ── Schedule: hide table, show card list ── */
+  .sched-table thead{display:none;}
+  .sched-table tr{display:block;margin-bottom:8px;
+    background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px;}
+  .sched-table td{display:block;padding:3px 6px;border:none;font-size:11px;}
+
+  /* ── Org chart: 2 cols instead of 4 ── */
+  .org-cols{grid-template-columns:repeat(2,1fr) !important;}
+  .org-card{max-width:100% !important;}
+  .org-wrap{padding:16px 10px 80px;}
+
+  /* ── R.O.C.K.E.T: smaller btn on narrow screen ── */
+  #jarvis-title{font-size:20px;letter-spacing:4px;}
+  #jarvis-transcript-wrap,#jarvis-response-wrap{padding:8px 12px;}
+  #jarvis-response{font-size:12px;}
+
+  /* ── Trends panel: 3 cols on mobile ── */
+  #trends-grid{grid-template-columns:repeat(3,1fr) !important;}
+}
+
+/* Tablet 769–1024px: keep desktop layout but tighter */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .layout{grid-template-columns:190px 1fr 240px !important;}
+  .hstats > div[style*="display:flex"] a{font-size:9px;padding:4px 7px;}
+  .hstats > button{font-size:9px;padding:4px 7px;}
+}
+
+/* ── Mobile overlay (shared between left & right drawers) ── */
+#mob-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:199;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(2px);
+}
+#mob-overlay.show{display:block;}
+
+/* ── Floating action bar (hidden on desktop) ── */
+#mob-fab{
+  display:none;
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+  z-index:198;gap:8px;
+  background:rgba(10,14,26,.92);border:1px solid #1e3060;
+  border-radius:32px;padding:7px 12px;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
+}
+#mob-fab button{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  background:none;border:none;color:var(--text2);
+  font-size:10px;font-family:'Rajdhani',sans-serif;font-weight:700;
+  padding:6px 10px;border-radius:20px;cursor:pointer;transition:.15s;
+  letter-spacing:.5px;
+}
+#mob-fab button:active{background:var(--panel2);}
+#mob-fab button.fab-on{color:var(--blue);background:rgba(79,158,255,.12);}
+
+/* ── Mobile hamburger menu (hidden on desktop) ── */
+#mob-menu-btn{
+  display:none;
+  background:none;border:none;color:var(--text2);
+  font-size:18px;cursor:pointer;padding:4px;flex-shrink:0;
+}
+#mob-menu-popup{
+  display:none;
+  position:fixed;top:50px;right:8px;z-index:300;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  padding:8px;gap:6px;flex-direction:column;min-width:160px;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+#mob-menu-popup.show{display:flex;}
+#mob-menu-popup a,#mob-menu-popup button{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 10px;border-radius:5px;
+  font-size:11px;font-family:'Rajdhani',sans-serif;font-weight:700;
+  text-decoration:none;cursor:pointer;
+  background:none;border:none;width:100%;text-align:left;
+  transition:.12s;
+}
+#mob-menu-popup a:hover,#mob-menu-popup button:hover{background:var(--panel2);}
 </style>
 </head>
 <body>
@@ -361,8 +511,60 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
         Chain
       </button>
     </div>
+    <!-- Mobile hamburger (hidden on desktop via CSS) -->
+    <button id="mob-menu-btn" onclick="toggleMobMenu()" title="เมนู">☰</button>
+
     <div><div id="clk">--:--:--</div><div id="datex">loading...</div></div>
   </div>
+</div>
+
+<!-- Mobile menu popup (shortcuts) -->
+<div id="mob-menu-popup">
+  <a href="https://docs.google.com/spreadsheets/d/1wXZI3aXj21ZkhcJgUA4lD5BewjzridVtbHaNeNgnxJQ/edit"
+     target="_blank" style="color:#4ade80;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3zM8 17H6v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+    </svg> Reports
+  </a>
+  <a href="https://drive.google.com/drive/folders/1m4IHMoxU0Wj_tBP8W90ql2JJewkP7kEM"
+     target="_blank" style="color:#4f9eff;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+    </svg> Drive
+  </a>
+  <button onclick="setupRichMenu();toggleMobMenu();" style="color:#a78bfa;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="3" y="5" width="18" height="14" rx="1"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="5" x2="8" y2="19"/>
+    </svg> Rich Menu
+  </button>
+  <button onclick="openChainModal();toggleMobMenu();" style="color:#4ade80;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/>
+      <line x1="8" y1="11" x2="16" y2="7"/><line x1="8" y1="13" x2="16" y2="17"/>
+    </svg> Chain
+  </button>
+</div>
+
+<!-- Mobile overlay backdrop -->
+<div id="mob-overlay" onclick="closeMobDrawers()"></div>
+
+<!-- Mobile FAB (floating action bar) -->
+<div id="mob-fab">
+  <button id="fab-agents" onclick="toggleMobLeft()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg> Agents
+  </button>
+  <button id="fab-chat" onclick="toggleMobRight()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+    </svg> Chat
+  </button>
+  <button id="fab-rocket" onclick="goTab('pg-jarvis')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.5 7 4 12 4 16c0 3.3 2.7 6 6 6h4c3.3 0 6-2.7 6-6 0-4-2.5-9-8-14z"/>
+    </svg> Voice
+  </button>
 </div>
 
 <!-- ═══ NAV ═══ -->
@@ -788,6 +990,7 @@ async function pollChat() {
       cl.scrollTop = cl.scrollHeight;
       document.getElementById('h-msgs').textContent = msgCount;
       if (d.logs.length) chatSince = d.logs[d.logs.length - 1].ts || Date.now();
+      if (typeof mobNotifyChat === 'function') mobNotifyChat();
     }
   } catch(e) {}
 }
@@ -2347,6 +2550,145 @@ async function setupRichMenu() {
 }
 
 window.addEventListener('load', init);
+
+// ══════════════════════════════════════════════════════════
+// MOBILE UI
+// ══════════════════════════════════════════════════════════
+function isMobile() { return window.innerWidth <= 768; }
+
+// ── Nav helper: go to a tab by page id ────────────────────
+function goTab(pageId) {
+  const tab = document.querySelector(`.ntab[data-page="${pageId}"]`);
+  if (tab) tab.click();
+}
+
+// ── Mobile hamburger menu ─────────────────────────────────
+function toggleMobMenu() {
+  const popup = document.getElementById('mob-menu-popup');
+  popup.classList.toggle('show');
+  // tap outside to close
+  if (popup.classList.contains('show')) {
+    setTimeout(() => {
+      document.addEventListener('click', function _close(e) {
+        if (!popup.contains(e.target) && e.target.id !== 'mob-menu-btn') {
+          popup.classList.remove('show');
+          document.removeEventListener('click', _close);
+        }
+      });
+    }, 50);
+  }
+}
+
+// ── Mobile left drawer (agent list) ──────────────────────
+let _mobLeftOpen = false;
+function toggleMobLeft() {
+  _mobLeftOpen = !_mobLeftOpen;
+  const lp  = document.querySelector('.lpanel');
+  const ov  = document.getElementById('mob-overlay');
+  const fab = document.getElementById('fab-agents');
+  if (!lp) return;
+  if (_mobLeftOpen) {
+    lp.classList.add('mob-open');
+    ov.classList.add('show');
+    if (fab) fab.classList.add('fab-on');
+    // close right if open
+    if (_mobRightOpen) _closeRight();
+  } else {
+    _closeLeft();
+  }
+}
+function _closeLeft() {
+  _mobLeftOpen = false;
+  const lp  = document.querySelector('.lpanel');
+  const fab = document.getElementById('fab-agents');
+  if (lp) lp.classList.remove('mob-open');
+  if (fab) fab.classList.remove('fab-on');
+  _tryHideOverlay();
+}
+
+// ── Mobile right panel / bottom sheet ─────────────────────
+let _mobRightOpen = false;
+function toggleMobRight() {
+  _mobRightOpen = !_mobRightOpen;
+  const rp  = document.getElementById('rpanel');
+  const ov  = document.getElementById('mob-overlay');
+  const fab = document.getElementById('fab-chat');
+  if (!rp) return;
+  if (_mobRightOpen) {
+    rp.classList.add('mob-open');
+    ov.classList.add('show');
+    if (fab) fab.classList.add('fab-on');
+    // close left if open
+    if (_mobLeftOpen) _closeLeft();
+    // scroll chat to bottom
+    setTimeout(() => {
+      const cl = document.getElementById('chatlog');
+      if (cl) cl.scrollTop = cl.scrollHeight;
+    }, 250);
+  } else {
+    _closeRight();
+  }
+}
+function _closeRight() {
+  _mobRightOpen = false;
+  const rp  = document.getElementById('rpanel');
+  const fab = document.getElementById('fab-chat');
+  if (rp) rp.classList.remove('mob-open');
+  if (fab) fab.classList.remove('fab-on');
+  _tryHideOverlay();
+}
+
+function _tryHideOverlay() {
+  if (!_mobLeftOpen && !_mobRightOpen) {
+    const ov = document.getElementById('mob-overlay');
+    if (ov) ov.classList.remove('show');
+  }
+}
+
+function closeMobDrawers() {
+  _closeLeft();
+  _closeRight();
+  document.getElementById('mob-overlay')?.classList.remove('show');
+}
+
+// ── Close FAB drawers when switching to non-office tab ────
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.ntab').forEach(t => {
+    t.addEventListener('click', () => {
+      if (isMobile()) {
+        closeMobDrawers();
+        // Hide FAB on non-office pages
+        const fab = document.getElementById('mob-fab');
+        if (fab) fab.style.display = t.dataset.page === 'pg-office' ? 'flex' : 'none';
+      }
+    });
+  });
+});
+
+// ── Auto-open chat when new chat arrives on mobile ─────────
+// (optional: pulse the chat FAB on new message)
+function mobNotifyChat() {
+  if (!isMobile() || _mobRightOpen) return;
+  const fab = document.getElementById('fab-chat');
+  if (!fab) return;
+  fab.style.animation = 'bk .4s ease 3';
+  setTimeout(() => { if (fab) fab.style.animation = ''; }, 1500);
+}
+
+// ── Touch swipe on canvas: left=open agents, right=close ──
+(function initSwipe() {
+  const canvas = document.getElementById('oc');
+  if (!canvas) return;
+  let startX = 0;
+  canvas.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
+  canvas.addEventListener('touchend', e => {
+    if (!isMobile()) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) < 40) return;  // ignore tiny swipes
+    if (dx > 60 && !_mobLeftOpen) toggleMobLeft();
+    else if (dx < -60 && _mobLeftOpen) _closeLeft();
+  }, {passive:true});
+})();
 
 // ── KPI Trends (Historical Memory) ───────────────────────────────────────────
 let _trendsVisible = true;
