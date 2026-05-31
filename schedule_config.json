@@ -6,6 +6,14 @@
       "agent": "Rocket",
       "task": "Consolidated Morning Report (Coin + People + Sage)",
       "enabled": true
+    },
+    {
+      "type": "weekly_meeting",
+      "time": "09:30",
+      "days": ["Mon"],
+      "agent": "All Agents (11)",
+      "task": "Monday All-Hands Meeting — ทุกแผนกรายงานสัปดาห์",
+      "enabled": true
     }
   ]
 }

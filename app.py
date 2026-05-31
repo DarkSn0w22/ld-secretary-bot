@@ -944,6 +944,32 @@ def api_memory_history():
         return jsonify({"metric": metric, "history": [], "error": str(e)})
 
 
+@app.route("/api/weekly-meeting", methods=["POST"])
+def api_weekly_meeting():
+    """
+    Manual trigger: Monday All-Hands Meeting
+    รัน background — return ทันที แล้ว push LINE เมื่อเสร็จ
+    """
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import threading
+        from weekly_meeting import run_monday_meeting
+        log_agent("dashboard", "meeting", "manual trigger: Monday All-Hands")
+        threading.Thread(
+            target=run_monday_meeting,
+            kwargs={"user_id": PEANUT_USER_ID},
+            daemon=True,
+            name="manual-meeting"
+        ).start()
+        return jsonify({
+            "ok":      True,
+            "message": "การประชุมเริ่มแล้ว — รายงานจะส่งไป LINE ใน 1-2 นาทีครับ"
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/memory-seed", methods=["POST"])
 def api_memory_seed():
     """

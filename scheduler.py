@@ -281,22 +281,53 @@ def run_watch_cycle_background():
         log_agent("scheduler", "system", "[watch-cycle] error", str(e), status="error")
 
 
+def run_monday_meeting_background():
+    """รัน Monday All-Hands Meeting ใน background thread"""
+    try:
+        from weekly_meeting import run_monday_meeting
+        print("[Scheduler] Launching Monday All-Hands Meeting...")
+        run_monday_meeting(user_id=PEANUT_USER_ID)
+        print("[Scheduler] Monday meeting completed ✓")
+    except Exception as e:
+        print(f"[Scheduler] Monday meeting error: {e}")
+        log_agent("scheduler", "system", "[meeting] error", str(e), status="error")
+
+
+# ── Monday Meeting config (อ่านจาก schedule_config.json) ────────────────────
+_MEETING_DEFAULT_HOUR   = 9
+_MEETING_DEFAULT_MINUTE = 30
+
+def get_meeting_time():
+    """ดึงเวลาประชุมจาก schedule_config.json"""
+    cfg = get_schedule_config()
+    for job in cfg.get("jobs", []):
+        if job.get("type") == "weekly_meeting" and job.get("enabled", True):
+            try:
+                hh, mm = job["time"].split(":")
+                return int(hh), int(mm)
+            except Exception:
+                pass
+    return _MEETING_DEFAULT_HOUR, _MEETING_DEFAULT_MINUTE
+
+
 def scheduler_loop():
-    print("Scheduler started — morning report 09:00 + activity digests 11:00/15:00/19:00 "
-          "+ autonomous watch 08:00/12:00/16:00/20:00")
-    sent_today = None
-    sent_digest_hours = set()   # เซ็ต hours ที่ส่ง digest ไปแล้วในวันนี้
-    sent_watch_hours = set()    # เซ็ต hours ที่ trigger watch cycle ไปแล้วในวันนี้
+    print("Scheduler started — morning report 09:00 + Monday all-hands 09:30 "
+          "+ autonomous watch 12:00")
+    sent_today        = None
+    sent_digest_hours = set()
+    sent_watch_hours  = set()
+    sent_meeting_week = None   # ISO week string "YYYY-WW"
 
     while True:
-        now = datetime.now(BANGKOK_TZ)
-        today = now.date()
-        weekday = now.weekday()
+        now     = datetime.now(BANGKOK_TZ)
+        today   = now.date()
+        weekday = now.weekday()                        # 0=จันทร์
+        iso_wk  = now.strftime("%G-%V")               # e.g. "2026-23"
 
         # รีเซ็ต trackers เมื่อขึ้นวันใหม่
         if sent_today != today:
             sent_digest_hours = set()
-            sent_watch_hours = set()
+            sent_watch_hours  = set()
 
         # ── Morning Report — เวลาจาก schedule_config.json ──────────
         mh, mm = get_morning_hour_minute()
@@ -314,7 +345,22 @@ def scheduler_loop():
             except Exception as e:
                 print(f"[Scheduler] Morning report error: {e}")
 
-        # ── Activity Digest 11:00 / 15:00 / 19:00 ───────────────
+        # ── Monday All-Hands Meeting ─────────────────────────────────
+        mth, mtm = get_meeting_time()
+        if (weekday == 0 and                           # วันจันทร์
+                now.hour == mth and
+                now.minute == mtm and
+                sent_meeting_week != iso_wk):          # ยังไม่ได้รันสัปดาห์นี้
+            print(f"[Scheduler] Monday All-Hands Meeting {now.strftime('%H:%M')}...")
+            sent_meeting_week = iso_wk                 # mark ก่อนเพื่อป้องกัน double-trigger
+            meeting_thread = threading.Thread(
+                target=run_monday_meeting_background,
+                daemon=True,
+                name="monday-meeting"
+            )
+            meeting_thread.start()
+
+        # ── Activity Digest ──────────────────────────────────────────
         if (now.hour in ACTIVITY_DIGEST_HOURS and
                 now.minute == 0 and
                 weekday in WORK_DAYS and
@@ -332,13 +378,13 @@ def scheduler_loop():
             except Exception as e:
                 print(f"[Scheduler] Activity digest error: {e}")
 
-        # ── Autonomous Watch Cycle 08:00 / 12:00 / 16:00 / 20:00 จ-ศ ──
+        # ── Autonomous Watch Cycle 12:00 จ-ศ ────────────────────────
         if (now.hour in WATCH_HOURS and
                 now.minute == 0 and
                 weekday in WORK_DAYS and
                 now.hour not in sent_watch_hours):
             print(f"[Scheduler] Triggering autonomous watch cycle at {now.hour}:00...")
-            sent_watch_hours.add(now.hour)  # mark ก่อนเพื่อป้องกัน double-trigger
+            sent_watch_hours.add(now.hour)
             watch_thread = threading.Thread(
                 target=run_watch_cycle_background,
                 daemon=True,
