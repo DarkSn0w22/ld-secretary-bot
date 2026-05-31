@@ -588,6 +588,16 @@ const canvas = document.getElementById('oc');
 const ctx = canvas.getContext('2d');
 let W = 0, H = 0;
 
+// Background image — loaded WITHOUT crossOrigin (no pixel access needed)
+let bgImg = null;
+(function() {
+  const img = new Image();
+  // No crossOrigin = no CORS issue, no browser cache poison
+  img.onload = () => { bgImg = img; };
+  img.onerror = () => { bgImg = null; console.warn('bg load failed, using canvas fallback'); };
+  img.src = '/static/office_bg.png';
+})();
+
 // Room geometry (computed on resize)
 let rooms = [];        // {x, y, w, h, agent, cx, cy} per room
 let sprites = [];      // character state per agent
@@ -1159,10 +1169,37 @@ function drawSofa(x, y, w) {
 }
 
 // ── Main render ──
+// Draw only characters + selection highlight (used when bg image is loaded)
+function drawCharactersOnly() {
+  rooms.forEach((rm, i) => {
+    const spr = sprites[i];
+    if (!rm.agent || !spr) return;
+    drawCharacter(spr.x, spr.y, rm.agent, spr, i === 0);
+  });
+  if (selectedAgent) {
+    const ri = ROOM_ORDER.findIndex(a => a.id === selectedAgent);
+    if (ri >= 0 && rooms[ri]) {
+      const rm = rooms[ri];
+      ctx.strokeStyle = ROOM_ORDER[ri].color;
+      ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+      ctx.strokeRect(rm.x-1, rm.y-1, rm.w+2, rm.h+2);
+      ctx.setLineDash([]);
+    }
+  }
+}
+
 function drawOffice() {
   ctx.clearRect(0, 0, W, H);
 
-  // Dark exterior background
+  // ── Background: real image if loaded, canvas fallback otherwise ──
+  if (bgImg) {
+    ctx.drawImage(bgImg, 0, 0, W, H);
+    // Draw characters on top and return early (no canvas furniture needed)
+    drawCharactersOnly();
+    return;
+  }
+
+  // ── Canvas fallback ──────────────────────────────────────────────
   ctx.fillStyle = '#0a0e18';
   ctx.fillRect(0, 0, W, H);
 
