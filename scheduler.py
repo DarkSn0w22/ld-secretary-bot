@@ -365,12 +365,12 @@ def scheduler_loop():
                 now.minute == mm and
                 weekday in mdays and
                 sent_today != today):
+            sent_today = today   # mark ก่อน — ป้องกัน double-trigger ถ้า API ช้า/error
             print("[Scheduler] Generating consolidated morning report...")
             try:
                 report = consolidated_morning_report()
-                if push_message(report):
-                    sent_today = today
-                    print("[Scheduler] Morning report sent ✓")
+                push_message(report)
+                print("[Scheduler] Morning report sent ✓")
             except Exception as e:
                 print(f"[Scheduler] Morning report error: {e}")
 
@@ -440,6 +440,28 @@ def scheduler_loop():
 
 
 def start_scheduler():
+    """
+    Start scheduler — ใช้ file lock เพื่อให้มีแค่ 1 process รัน scheduler
+    (ป้องกัน Gunicorn multi-worker ทำงานซ้ำ)
+    """
+    import os, sys
+
+    # ── Process lock via fcntl (Linux/Mac) ──────────────────────
+    lock_path = "/tmp/.owndays_scheduler.lock"
+    try:
+        import fcntl
+        lock_fd = open(lock_path, "w")
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # เขียน PID เพื่อ debug
+        lock_fd.write(str(os.getpid()))
+        lock_fd.flush()
+        # ไม่ close fd — lock หลุดเมื่อ process ตาย
+        print(f"[Scheduler] Process lock acquired (pid={os.getpid()})")
+    except (ImportError, IOError, OSError):
+        # fcntl ไม่มี (Windows dev) หรือ process อื่นถือ lock อยู่แล้ว
+        print("[Scheduler] Another process already holds the lock — skipping scheduler start")
+        return
+
     thread = threading.Thread(target=scheduler_loop, daemon=True)
     thread.start()
     print("Scheduler thread started")
