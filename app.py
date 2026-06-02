@@ -46,6 +46,7 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 DASHBOARD_TOKEN = os.getenv("DASHBOARD_TOKEN", "")  # ถ้าเว้นว่าง = เปิด public (จะเตือนใน log)
+PEANUT_USER_ID = os.getenv("PEANUT_USER_ID", "U668b7978706b2feaf61d071cc0080177")
 
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
