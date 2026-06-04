@@ -994,6 +994,20 @@ def api_weekly_meeting():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/sync-memory", methods=["POST"])
+def api_sync_memory():
+    """Sync historical memory จาก /tmp JSON → Google Sheets (manual trigger)"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from historical_memory import sync_to_sheets
+        result = sync_to_sheets()
+        log_agent("dashboard", "sheets", "manual memory sync", str(result))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/test-sheets", methods=["POST"])
 def api_test_sheets():
     """ทดสอบ Google Sheets connection + write — กดจาก Dashboard เพื่อ diagnose"""

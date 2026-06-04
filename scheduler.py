@@ -422,6 +422,17 @@ def scheduler_loop():
             except Exception as e:
                 print(f"[Scheduler] Activity digest error: {e}")
 
+        # ── Daily memory sync to Sheets 23:00 (once/day) ─────────────
+        if (now.hour == 23 and now.minute == 0 and sent_today != today):
+            def _sync_mem():
+                try:
+                    from historical_memory import sync_to_sheets
+                    r = sync_to_sheets()
+                    print(f"[Scheduler] Memory sync: {r}")
+                except Exception as e:
+                    print(f"[Scheduler] Memory sync error: {e}")
+            threading.Thread(target=_sync_mem, daemon=True, name="mem-sync").start()
+
         # ── Autonomous Watch Cycle 12:00 จ-ศ ────────────────────────
         if (now.hour in WATCH_HOURS and
                 now.minute == 0 and

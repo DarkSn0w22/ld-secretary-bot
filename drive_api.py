@@ -6,6 +6,7 @@ Sheet: OWNDAYS AI Reports (1 spreadsheet, แยก tab ต่อ agent)
 import os
 import json
 import base64
+import time
 from datetime import datetime
 import pytz
 
@@ -103,6 +104,16 @@ def save_report(agent_id: str, task: str, report_text: str) -> dict:
     except Exception as e:
         err_str = str(e)
         print(f"[Reports] save error (attempt 1): {err_str}")
+
+        # ── Retry on 429 (quota exceeded) — sleep 2 s then retry once ─
+        if "429" in err_str:
+            print("[Reports] 429 quota exceeded — sleeping 2 s then retrying...")
+            time.sleep(2)
+            try:
+                return _try_save(gc)
+            except Exception as e2:
+                print(f"[Reports] save error (attempt 2, 429 retry): {e2}")
+                return {"ok": False, "error": str(e2)}
 
         # ── Retry with fresh client (token อาจ expire) ────────────
         if any(k in err_str.lower() for k in ("invalid", "expired", "401", "403", "token")):
