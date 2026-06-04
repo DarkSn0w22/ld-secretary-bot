@@ -3,10 +3,12 @@ KPI Alert System — แจ้งเตือนทันทีเมื่อ K
 ไม่รอ watch cycle — push LINE ได้ทันที
 """
 import os
+import json
+import threading
 from datetime import datetime, timedelta
 import pytz
 
-BANGKOK_TZ = pytz.timezone("Asia/Bangkok")
+BANGKOK_TZ  = pytz.timezone("Asia/Bangkok")
 
 # ── เกณฑ์ KPI (ปรับได้ผ่าน env vars) ────────────────────────────────────────
 THRESHOLDS = {
@@ -34,20 +36,67 @@ THRESHOLDS = {
     "web_latency_crit_ms":  int(os.getenv("KPI_WEB_CRIT",       "8000")),   # > 8s
 }
 
-# ── Alert deduplication (ไม่ส่ง alert ซ้ำภายใน cooldown) ────────────────────
-_sent: dict = {}   # {alert_key: datetime}
-DEFAULT_COOLDOWN_H = 12   # ส่งซ้ำได้ทุก 12 ชั่วโมง
+# ── Alert deduplication ───────────────────────────────────────────────────────
+# File-based state เพื่อ share ข้าม Gunicorn workers ได้
+# in-memory _sent เป็น fast-path cache
+_sent: dict       = {}
+_sent_lock        = threading.Lock()
+_STATE_FILE       = "/tmp/.kpi_alert_state.json"
+DEFAULT_COOLDOWN_H = 12
+
+
+def _load_state() -> dict:
+    try:
+        with open(_STATE_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_state(state: dict):
+    try:
+        tmp = _STATE_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(state, f)
+        os.replace(tmp, _STATE_FILE)   # atomic
+    except Exception:
+        pass
 
 
 def _can_alert(key: str, cooldown_h: int = DEFAULT_COOLDOWN_H) -> bool:
-    last = _sent.get(key)
-    if not last:
-        return True
-    return (datetime.now(BANGKOK_TZ) - last).total_seconds() > cooldown_h * 3600
+    now   = datetime.now(BANGKOK_TZ)
+    limit = cooldown_h * 3600
+    with _sent_lock:
+        # fast path: memory
+        last = _sent.get(key)
+        if last and (now - last).total_seconds() <= limit:
+            return False
+        # cross-process: file
+        state = _load_state()
+        ts    = state.get(key)
+        if ts:
+            try:
+                last_f = datetime.fromisoformat(ts)
+                if last_f.tzinfo is None:
+                    last_f = BANGKOK_TZ.localize(last_f)
+                if (now - last_f).total_seconds() <= limit:
+                    _sent[key] = last_f   # sync to memory
+                    return False
+            except Exception:
+                pass
+    return True
 
 
 def _mark(key: str):
-    _sent[key] = datetime.now(BANGKOK_TZ)
+    now = datetime.now(BANGKOK_TZ)
+    with _sent_lock:
+        _sent[key] = now
+        state = _load_state()
+        state[key] = now.isoformat()
+        # prune entries older than 48 h
+        cutoff = (now - timedelta(hours=48)).isoformat()
+        state  = {k: v for k, v in state.items() if v >= cutoff}
+        _save_state(state)
 
 
 def _push(text: str):
