@@ -315,9 +315,16 @@ def run_friday_review(user_id: str = None) -> dict:
             f"=== GUARD WEEKLY REVIEW ===\n{guard_review}\n\n"
             f"=== ATLAS STRATEGIC PLAN ===\n{atlas_plan}"
         )
-        save_report("friday_review", f"Friday Review {date_str}", combined)
-    except Exception:
-        pass
+        res = save_report("friday_review", f"Friday Review {date_str}", combined)
+        if res.get("ok"):
+            log_agent("friday_review", "sheets", "saved", res.get("url",""))
+            print(f"[FridayReview] Saved to Sheets ✅ {res.get('url','')}")
+        else:
+            log_agent("friday_review", "sheets", "save FAILED", res.get("error",""), status="error")
+            print(f"[FridayReview] ❌ Sheets save failed: {res.get('error')}")
+    except Exception as e:
+        print(f"[FridayReview] ❌ Sheets save exception: {e}")
+        log_agent("friday_review", "sheets", "save exception", str(e), status="error")
 
     log_agent("friday_review", "rocket",
               f"[review] complete — {len(sent)} messages", "")

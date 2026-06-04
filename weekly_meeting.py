@@ -390,9 +390,16 @@ def run_monday_meeting(user_id: str = None) -> list[str]:
     try:
         from drive_api import save_report
         full_report = "\n\n---\n\n".join(chunks)
-        save_report("meeting", f"Monday All-Hands {meeting_date}", full_report)
-    except Exception:
-        pass
+        res = save_report("meeting", f"Monday All-Hands {meeting_date}", full_report)
+        if res.get("ok"):
+            log_agent("meeting", "sheets", "saved", res.get("url",""))
+            print(f"[Meeting] Saved to Sheets ✅ {res.get('url','')}")
+        else:
+            log_agent("meeting", "sheets", "save FAILED", res.get("error",""), status="error")
+            print(f"[Meeting] ❌ Sheets save failed: {res.get('error')}")
+    except Exception as e:
+        print(f"[Meeting] ❌ Sheets save exception: {e}")
+        log_agent("meeting", "sheets", "save exception", str(e), status="error")
 
     log_agent("rocket", "user", f"[meeting] done — {len(sent)} messages sent", "")
     print(f"[Meeting] Complete — {len(sent)} LINE messages sent")

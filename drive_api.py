@@ -15,10 +15,10 @@ BANGKOK_TZ = pytz.timezone("Asia/Bangkok")
 _gc = None   # gspread client (cached)
 
 
-def _get_gspread():
-    """คืน gspread client — ใช้ service account เดิม"""
+def _get_gspread(force_refresh: bool = False):
+    """คืน gspread client — refresh ถ้า stale หรือ force"""
     global _gc
-    if _gc:
+    if _gc and not force_refresh:
         return _gc
     try:
         import gspread
@@ -37,55 +37,85 @@ def _get_gspread():
             creds = service_account.Credentials.from_service_account_file(key_file, scopes=SCOPES)
 
         _gc = gspread.authorize(creds)
+        print("[Reports] gspread client ready ✓")
         return _gc
     except Exception as e:
+        _gc = None
         print(f"[Reports] gspread init error: {e}")
         return None
 
 
 def _get_or_create_tab(ss, tab_name: str):
-    """หา worksheet ที่มีชื่อนั้น หรือสร้างใหม่"""
+    """หา worksheet ที่มีชื่อนั้น หรือสร้างใหม่ — fallback to first sheet"""
+    # 1. หา tab ที่มีชื่อตรง
     try:
         return ss.worksheet(tab_name)
     except Exception:
-        ws = ss.add_worksheet(title=tab_name, rows=1000, cols=8)
-        # Header row
+        pass
+
+    # 2. ลองสร้าง tab ใหม่
+    try:
+        ws = ss.add_worksheet(title=tab_name, rows=2000, cols=5)
         ws.update("A1", [["Timestamp", "Agent", "Task", "Report", "Status"]])
+        print(f"[Reports] Created new tab '{tab_name}'")
         return ws
+    except Exception as e:
+        print(f"[Reports] Cannot create tab '{tab_name}': {e} — using first sheet")
+
+    # 3. Fallback: ใช้ sheet แรกที่มีอยู่
+    try:
+        ws = ss.get_worksheet(0)
+        print(f"[Reports] Fallback to first sheet: '{ws.title}'")
+        return ws
+    except Exception as e2:
+        raise Exception(f"Cannot access any worksheet: {e2}")
 
 
 def save_report(agent_id: str, task: str, report_text: str) -> dict:
     """
     บันทึกรายงานลง Google Sheets
-    - Tab ชื่อ agent (เช่น Rex, Sage, Coin)
+    - Tab ชื่อ agent (Meeting, Rex, Sage, Coin ฯลฯ)
     - แถวใหม่ต่อการ save ทุกครั้ง
-    - คืน {ok, url, tab, row}
+    - คืน {ok, url, tab}
+    - ถ้า client stale จะ refresh อัตโนมัติ 1 ครั้ง
     """
-    gc = _get_gspread()
-    if not gc or not REPORTS_SHEET_ID:
-        return {"ok": False, "error": "Sheets client ไม่พร้อม"}
+    if not REPORTS_SHEET_ID:
+        return {"ok": False, "error": "REPORTS_SHEET_ID ไม่ได้ตั้งค่า"}
 
-    try:
-        ss = gc.open_by_key(REPORTS_SHEET_ID)
-        tab_name = agent_id.capitalize()   # Rex, Sage, Coin, etc.
-        ws = _get_or_create_tab(ss, tab_name)
-
-        now = datetime.now(BANGKOK_TZ).strftime("%Y-%m-%d %H:%M")
-        # ตัดข้อความยาวเกิน 50000 chars (Sheets limit per cell ~50k)
-        report_trimmed = report_text[:49000] if len(report_text) > 49000 else report_text
-
-        ws.append_row(
-            [now, tab_name, task[:200], report_trimmed, "✅"],
-            value_input_option="RAW",
-        )
-
+    def _try_save(gc_client):
+        ss       = gc_client.open_by_key(REPORTS_SHEET_ID)
+        tab_name = agent_id.capitalize()
+        ws       = _get_or_create_tab(ss, tab_name)
+        now      = datetime.now(BANGKOK_TZ).strftime("%Y-%m-%d %H:%M")
+        trimmed  = report_text[:49000]
+        ws.append_row([now, tab_name, task[:200], trimmed, "✅"],
+                      value_input_option="RAW")
         url = f"https://docs.google.com/spreadsheets/d/{REPORTS_SHEET_ID}/edit#gid={ws.id}"
-        print(f"[Reports] {tab_name} report saved → {url}")
+        print(f"[Reports] ✅ {tab_name} saved → {url}")
         return {"ok": True, "url": url, "tab": tab_name, "timestamp": now}
 
+    # ── First attempt ─────────────────────────────────────────────
+    gc = _get_gspread()
+    if not gc:
+        return {"ok": False, "error": "gspread client ไม่พร้อม (credentials?)"}
+    try:
+        return _try_save(gc)
     except Exception as e:
-        print(f"[Reports] save error: {e}")
-        return {"ok": False, "error": str(e)}
+        err_str = str(e)
+        print(f"[Reports] save error (attempt 1): {err_str}")
+
+        # ── Retry with fresh client (token อาจ expire) ────────────
+        if any(k in err_str.lower() for k in ("invalid", "expired", "401", "403", "token")):
+            print("[Reports] Refreshing gspread client and retrying...")
+            gc2 = _get_gspread(force_refresh=True)
+            if gc2:
+                try:
+                    return _try_save(gc2)
+                except Exception as e2:
+                    print(f"[Reports] save error (attempt 2): {e2}")
+                    return {"ok": False, "error": str(e2)}
+
+        return {"ok": False, "error": err_str}
 
 
 def save_table_report(agent_id: str, task: str, rows: list) -> dict:

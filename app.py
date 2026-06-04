@@ -994,6 +994,45 @@ def api_weekly_meeting():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/test-sheets", methods=["POST"])
+def api_test_sheets():
+    """ทดสอบ Google Sheets connection + write — กดจาก Dashboard เพื่อ diagnose"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from drive_api import save_report, REPORTS_SHEET_ID, _get_gspread
+        result = {"sheet_id": REPORTS_SHEET_ID, "steps": []}
+
+        # Step 1: client
+        gc = _get_gspread()
+        result["steps"].append({"step": "gspread_client", "ok": gc is not None})
+        if not gc:
+            return jsonify({"ok": False, **result, "error": "gspread client failed — check GOOGLE_CREDENTIALS_JSON"})
+
+        # Step 2: open sheet
+        try:
+            ss = gc.open_by_key(REPORTS_SHEET_ID)
+            tabs = [ws.title for ws in ss.worksheets()]
+            result["steps"].append({"step": "open_sheet", "ok": True, "tabs": tabs})
+        except Exception as e:
+            result["steps"].append({"step": "open_sheet", "ok": False, "error": str(e)})
+            return jsonify({"ok": False, **result, "error": f"Cannot open sheet: {e}"})
+
+        # Step 3: test write
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        res = save_report("test", f"Sheets Test {now}", f"✅ Test write at {now} from Dashboard")
+        result["steps"].append({"step": "write_row", "ok": res.get("ok"), "detail": res})
+
+        if res.get("ok"):
+            log_agent("dashboard", "sheets", "test write ✅", res.get("url",""))
+            return jsonify({"ok": True, **result, "url": res.get("url")})
+        else:
+            return jsonify({"ok": False, **result, "error": res.get("error")})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/memory-seed", methods=["POST"])
 def api_memory_seed():
     """

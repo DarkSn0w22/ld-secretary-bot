@@ -451,6 +451,16 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
     <div class="hs"><div class="hsv" style="color:var(--yellow)" id="h-msgs">0</div><div class="hsl">Msgs</div></div>
     <!-- Google Drive / Reports shortcuts -->
     <div style="display:flex;gap:6px;align-items:center;margin:0 8px;">
+      <button onclick="testSheets()" title="ทดสอบ Sheets connection"
+        id="test-sheets-btn"
+        style="display:flex;align-items:center;gap:4px;padding:5px 8px;
+               background:#0a1a0a;border:1px solid #1a3a1a;border-radius:5px;
+               color:#3a6040;font-size:9px;font-family:'Rajdhani',sans-serif;
+               font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;"
+        onmouseover="this.style.borderColor='#4ade80';this.style.color='#4ade80'"
+        onmouseout="this.style.borderColor='#1a3a1a';this.style.color='#3a6040'">
+        🔌 Test
+      </button>
       <a href="https://docs.google.com/spreadsheets/d/1wXZI3aXj21ZkhcJgUA4lD5BewjzridVtbHaNeNgnxJQ/edit"
          target="_blank" title="OWNDAYS AI Reports — Google Sheets"
          style="display:flex;align-items:center;gap:5px;padding:5px 10px;
@@ -2839,6 +2849,29 @@ async function seedMemory() {
 // โหลด trends ตอน init + refresh ทุก 10 นาที
 setTimeout(loadKpiTrends, 2000);
 setInterval(loadKpiTrends, 10 * 60 * 1000);
+
+// ── Test Sheets ──────────────────────────────────────────────────────────────
+async function testSheets() {
+  const btn = document.getElementById('test-sheets-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳'; }
+  try {
+    const r = await fetch('/api/test-sheets', {method:'POST', headers:AUTH_HEADERS});
+    const d = await r.json();
+    if (d.ok) {
+      const tabs = d.steps?.find(s => s.step === 'open_sheet')?.tabs?.join(', ') || '';
+      alert(`✅ Sheets เชื่อมต่อสำเร็จ!\n\nTabs: ${tabs}\n\nTest row เขียนแล้ว:\n${d.url||''}`);
+      if (btn) { btn.innerHTML = '✅'; btn.style.color='#4ade80'; setTimeout(()=>{btn.innerHTML=orig;btn.style.color='';btn.disabled=false;},3000); }
+    } else {
+      const steps = (d.steps||[]).map(s=>`${s.ok?'✅':'❌'} ${s.step}: ${s.error||'ok'}`).join('\n');
+      alert(`❌ Sheets ไม่ผ่าน\n\n${steps}\n\nError: ${d.error||''}`);
+      if (btn) { btn.innerHTML = '❌'; btn.disabled = false; setTimeout(()=>{btn.innerHTML=orig;},3000); }
+    }
+  } catch(e) {
+    alert('Network error: ' + e);
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
 
 // ── Friday Review ────────────────────────────────────────────────────────────
 async function triggerFridayReview() {
