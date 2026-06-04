@@ -372,34 +372,43 @@ def run_monday_meeting(user_id: str = None) -> list[str]:
     print(f"[Meeting] All {len(reports)} agents reported — synthesizing...")
     log_agent("meeting", "rocket", f"[meeting] synthesizing {len(reports)} reports")
 
-    # ── Rocket synthesize → push LINE ────────────────────────────
+    # ── Rocket synthesize ─────────────────────────────────────────
     chunks = _synthesize_meeting(reports, meeting_date)
-    sent   = []
+    full_report = "\n\n---\n\n".join(chunks)
 
+    # ── Step 1: บันทึกลง Google Sheets ก่อน (ได้ URL มาแนบใน LINE) ──
+    sheets_url  = ""
+    sheets_note = ""
+    try:
+        from drive_api import save_report
+        res = save_report("meeting", f"Monday All-Hands {meeting_date}", full_report)
+        if res.get("ok"):
+            sheets_url  = res.get("url", "")
+            sheets_note = f"\n\n📁 บันทึกใน Google Sheets แล้วครับ\n🔗 {sheets_url}"
+            log_agent("meeting", "sheets", "saved ✅", sheets_url)
+            print(f"[Meeting] Saved to Sheets ✅ {sheets_url}")
+        else:
+            err = res.get("error", "unknown")
+            sheets_note = f"\n\n⚠️ บันทึก Sheets ไม่สำเร็จ: {err}"
+            log_agent("meeting", "sheets", "save FAILED ❌", err, status="error")
+            print(f"[Meeting] ❌ Sheets save failed: {err}")
+    except Exception as e:
+        sheets_note = f"\n\n⚠️ Sheets error: {e}"
+        print(f"[Meeting] ❌ Sheets exception: {e}")
+        log_agent("meeting", "sheets", "save exception", str(e), status="error")
+
+    # ── Step 2: Push LINE พร้อม Sheets URL ต่อท้ายข้อความสุดท้าย ──
+    sent = []
     try:
         from scheduler import push_message
         for i, chunk in enumerate(chunks):
-            if push_message(chunk):
-                sent.append(chunk)
-                if len(chunks) > 1:
-                    print(f"[Meeting] Pushed part {i+1}/{len(chunks)}")
+            # แนบ note เฉพาะข้อความสุดท้าย
+            to_send = chunk + (sheets_note if i == len(chunks) - 1 else "")
+            if push_message(to_send):
+                sent.append(to_send)
+                print(f"[Meeting] Pushed part {i+1}/{len(chunks)}")
     except Exception as e:
         print(f"[Meeting] push error: {e}")
-
-    # บันทึกลง Google Sheets
-    try:
-        from drive_api import save_report
-        full_report = "\n\n---\n\n".join(chunks)
-        res = save_report("meeting", f"Monday All-Hands {meeting_date}", full_report)
-        if res.get("ok"):
-            log_agent("meeting", "sheets", "saved", res.get("url",""))
-            print(f"[Meeting] Saved to Sheets ✅ {res.get('url','')}")
-        else:
-            log_agent("meeting", "sheets", "save FAILED", res.get("error",""), status="error")
-            print(f"[Meeting] ❌ Sheets save failed: {res.get('error')}")
-    except Exception as e:
-        print(f"[Meeting] ❌ Sheets save exception: {e}")
-        log_agent("meeting", "sheets", "save exception", str(e), status="error")
 
     log_agent("rocket", "user", f"[meeting] done — {len(sent)} messages sent", "")
     print(f"[Meeting] Complete — {len(sent)} LINE messages sent")

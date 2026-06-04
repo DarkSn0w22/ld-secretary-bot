@@ -185,7 +185,8 @@ def _run_atlas_plan(guard_review: str, kpi_summary: str) -> str:
 
 # ── Step 3: Rocket compile + push LINE ───────────────────────────────────────
 
-def _compile_and_push(guard_review: str, atlas_plan: str, user_id: str) -> list:
+def _compile_and_push(guard_review: str, atlas_plan: str, user_id: str,
+                      sheets_note: str = "") -> list:
     """Rocket รวม 2 ส่วน → รายงาน LINE หลายข้อความ (ถ้ายาว)"""
 
     now        = datetime.now(BANGKOK_TZ)
@@ -246,13 +247,14 @@ def _compile_and_push(guard_review: str, atlas_plan: str, user_id: str) -> list:
             parts.append(full_text[:4800])
             full_text = full_text[4800:]
 
-    # Push to LINE
+    # Push to LINE (แนบ sheets_note ต่อท้ายข้อความสุดท้าย)
     sent = []
     try:
         from scheduler import push_message
-        for part in parts:
-            if push_message(part):
-                sent.append(part)
+        for i, part in enumerate(parts):
+            to_send = part + (sheets_note if i == len(parts) - 1 else "")
+            if push_message(to_send):
+                sent.append(to_send)
     except Exception as pe:
         print(f"[FridayReview] push error: {pe}")
 
@@ -304,11 +306,9 @@ def run_friday_review(user_id: str = None) -> dict:
     print("[FridayReview] Atlas planning...")
     atlas_plan = _run_atlas_plan(guard_review, kpi_summary)
 
-    # ── Step 3: Rocket compile + push ────────────────────────────
-    print("[FridayReview] Rocket compiling + pushing LINE...")
-    sent = _compile_and_push(guard_review, atlas_plan, user_id)
-
-    # ── บันทึกลง Sheets ─────────────────────────────────────────
+    # ── Step 3: บันทึกลง Sheets ก่อน (ได้ URL แนบ LINE) ─────────
+    sheets_url  = ""
+    sheets_note = ""
     try:
         from drive_api import save_report
         combined = (
@@ -317,14 +317,23 @@ def run_friday_review(user_id: str = None) -> dict:
         )
         res = save_report("friday_review", f"Friday Review {date_str}", combined)
         if res.get("ok"):
-            log_agent("friday_review", "sheets", "saved", res.get("url",""))
-            print(f"[FridayReview] Saved to Sheets ✅ {res.get('url','')}")
+            sheets_url  = res.get("url", "")
+            sheets_note = f"\n\n📁 บันทึกใน Google Sheets แล้วครับ\n🔗 {sheets_url}"
+            log_agent("friday_review", "sheets", "saved ✅", sheets_url)
+            print(f"[FridayReview] Saved to Sheets ✅ {sheets_url}")
         else:
-            log_agent("friday_review", "sheets", "save FAILED", res.get("error",""), status="error")
-            print(f"[FridayReview] ❌ Sheets save failed: {res.get('error')}")
+            err = res.get("error", "unknown")
+            sheets_note = f"\n\n⚠️ บันทึก Sheets ไม่สำเร็จ: {err}"
+            log_agent("friday_review", "sheets", "save FAILED ❌", err, status="error")
+            print(f"[FridayReview] ❌ Sheets save failed: {err}")
     except Exception as e:
-        print(f"[FridayReview] ❌ Sheets save exception: {e}")
+        sheets_note = f"\n\n⚠️ Sheets error: {e}"
+        print(f"[FridayReview] ❌ Sheets exception: {e}")
         log_agent("friday_review", "sheets", "save exception", str(e), status="error")
+
+    # ── Step 4: Rocket compile + push LINE (พร้อม URL) ────────────
+    print("[FridayReview] Rocket compiling + pushing LINE...")
+    sent = _compile_and_push(guard_review, atlas_plan, user_id, sheets_note=sheets_note)
 
     log_agent("friday_review", "rocket",
               f"[review] complete — {len(sent)} messages", "")
