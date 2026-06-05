@@ -112,20 +112,59 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
   font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;}
 .cbtn:hover{filter:brightness(1.15);}
 
-/* ── Response / Chat ── */
-.rp{margin:0;background:var(--bg);border:1px solid #273a58;border-radius:4px;
-  padding:6px 8px;font-size:10px;line-height:1.5;color:var(--text);max-height:60px;
-  overflow-y:auto;white-space:pre-wrap;display:none;font-family:'Sarabun',sans-serif;}
-.chatlog{flex:1;overflow-y:auto;padding:4px 10px;background:var(--bg);display:flex;flex-direction:column;gap:2px;}
-.cline{display:flex;gap:6px;font-size:10px;animation:fi .2s ease;}
+/* ── Response / Chat (legacy compat) ── */
+.rp{display:none;}
+.chatlog{overflow-y:auto;padding:4px 10px;background:var(--bg);display:flex;flex-direction:column;gap:2px;}
+.cline{display:flex;gap:6px;font-size:9px;animation:fi .2s ease;}
 @keyframes fi{from{opacity:0;transform:translateY(2px)}to{opacity:1}}
-.ct{color:var(--text3);min-width:40px;}
-.ca{min-width:55px;font-weight:700;}
+.ct{color:var(--text3);min-width:38px;}
+.ca{min-width:50px;font-weight:700;}
 .cm{color:var(--text2);flex:1;line-height:1.3;font-family:'Sarabun',sans-serif;}
 .cline.ok .ca{color:var(--green);}
 .cline.info .ca{color:var(--blue);}
 .cline.warn .ca{color:var(--yellow);}
 .cline.err .ca{color:var(--red);}
+
+/* ── Chat Bubbles (conversation thread) ── */
+.chat-thread{flex:1;overflow-y:auto;padding:10px 12px;
+  display:flex;flex-direction:column;gap:10px;background:var(--bg);}
+.chat-msg{display:flex;flex-direction:column;max-width:88%;}
+.chat-msg.user{align-self:flex-end;align-items:flex-end;}
+.chat-msg.agent{align-self:flex-start;align-items:flex-start;}
+.chat-agent-label{font-size:9px;font-family:'Rajdhani',sans-serif;font-weight:700;
+  letter-spacing:.5px;margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+.chat-bubble{padding:9px 13px;border-radius:14px;font-size:12px;line-height:1.6;
+  font-family:'Sarabun',sans-serif;white-space:pre-wrap;word-break:break-word;
+  animation:fi .2s ease;}
+.chat-msg.user .chat-bubble{
+  background:#12284a;border:1px solid #1e3a6a;color:#c0d8ff;
+  border-bottom-right-radius:4px;}
+.chat-msg.agent .chat-bubble{
+  background:var(--panel);border:1px solid var(--border);color:var(--text);
+  border-bottom-left-radius:4px;}
+.chat-msg.thinking .chat-bubble{
+  background:#0f1a0f;border:1px solid #1a3a1a;color:#4a8a5a;font-style:italic;}
+.chat-time{font-size:8px;color:var(--text3);margin-top:3px;}
+
+/* ── Chat input area ── */
+.chat-input-wrap{flex-shrink:0;padding:8px 10px;
+  background:var(--panel2);border-top:2px solid #1a3060;}
+.chat-agent-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.chat-agent-label-sm{font-size:9px;color:var(--text3);white-space:nowrap;}
+.chat-textarea{width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;padding:8px 10px;color:var(--text);
+  font-family:'Sarabun',sans-serif;font-size:12px;line-height:1.5;
+  resize:none;outline:none;min-height:52px;max-height:120px;
+  overflow-y:auto;transition:.2s;scrollbar-width:thin;}
+.chat-textarea:focus{border-color:var(--blue);box-shadow:0 0 8px rgba(79,158,255,.2);}
+.chat-textarea::placeholder{color:var(--text3);}
+.chat-send-row{display:flex;justify-content:space-between;align-items:center;margin-top:5px;}
+.chat-hint{font-size:9px;color:var(--text3);}
+.chat-send-btn{padding:6px 16px;background:var(--blue);border:none;border-radius:6px;
+  color:#fff;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;transition:.15s;display:flex;align-items:center;gap:5px;}
+.chat-send-btn:hover{filter:brightness(1.15);}
+.chat-send-btn:disabled{opacity:.4;cursor:not-allowed;}
 
 /* ── Right Panel ── */
 .rpanel{border-left:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden;transition:width .2s ease;}
@@ -643,72 +682,93 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
       </div>
       <!-- Right: Stats + Command + Chat (resizable/collapsible) -->
       <div class="rpanel" id="rpanel">
-        <!-- Toggle hide -->
+        <!-- Header -->
         <div class="ph" style="cursor:pointer;user-select:none;flex-shrink:0;" onclick="toggleRPanel()">
-          🚀 Command &amp; Chat
+          💬 Chat
           <span id="rpanel-toggle" style="font-size:10px;color:var(--blue);margin-left:auto;">◀ hide</span>
         </div>
-        <div id="rpanel-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
 
-          <!-- Command section -->
-          <div style="flex-shrink:0;padding:8px;background:var(--panel2);border-bottom:1px solid var(--border);">
-            <div style="display:flex;gap:5px;margin-bottom:6px;align-items:center;">
-              <select class="csel" id="cmd-agent" style="flex-shrink:0;max-width:100px;"></select>
-              <input class="cinput" id="cmd-input" placeholder="พิมพ์คำสั่งให้ agent..." style="flex:1;">
-              <button class="cbtn" id="cmd-run">▶ RUN</button>
+        <div id="rpanel-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;">
+
+          <!-- ── CONVERSATION THREAD (ใหญ่สุด) ── -->
+          <div class="chat-thread" id="chat-thread">
+            <div style="text-align:center;padding:20px 0;">
+              <div style="font-size:20px;margin-bottom:6px;">💬</div>
+              <div style="font-size:11px;color:var(--text3);">เลือก agent แล้วพิมพ์คำสั่งด้านล่างครับ</div>
             </div>
-            <!-- Response area — ขยายได้ -->
-            <div id="cmd-resp" class="rp" style="display:none;max-height:140px;margin:0;font-size:11px;line-height:1.6;font-family:'Sarabun',sans-serif;"></div>
           </div>
 
-          <!-- KPI Trends (Historical Memory) -->
-          <div class="ph" style="cursor:pointer;flex-shrink:0;user-select:none;"
+          <!-- ── INPUT AREA ── -->
+          <div class="chat-input-wrap">
+            <!-- Agent selector row -->
+            <div class="chat-agent-row">
+              <span class="chat-agent-label-sm">TO:</span>
+              <select class="csel" id="cmd-agent" style="flex:1;max-width:160px;"></select>
+              <span id="cmd-agent-badge"
+                style="font-size:9px;padding:2px 7px;border-radius:8px;
+                       background:var(--panel);border:1px solid var(--border);
+                       color:var(--text2);white-space:nowrap;margin-left:auto;">
+                🚀 Rocket
+              </span>
+            </div>
+            <!-- Textarea -->
+            <textarea class="chat-textarea" id="cmd-input"
+              placeholder="พิมพ์คำสั่งให้ agent... (Enter ส่ง / Shift+Enter ขึ้นบรรทัด)"
+              rows="2"></textarea>
+            <!-- Send row -->
+            <div class="chat-send-row">
+              <span class="chat-hint">Enter ส่ง · Shift+Enter บรรทัดใหม่</span>
+              <button class="chat-send-btn" id="cmd-run">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+                </svg>
+                ส่ง
+              </button>
+            </div>
+          </div>
+
+          <!-- ── KPI Trends (collapsible, ซ่อนเริ่มต้น) ── -->
+          <div class="ph" style="cursor:pointer;flex-shrink:0;user-select:none;font-size:10px;"
                onclick="toggleTrendsPanel()" id="trends-ph">
             📈 KPI Trends
-            <span id="trends-toggle" style="font-size:9px;color:var(--cyan);margin-left:auto;">▼ hide</span>
+            <span id="trends-toggle" style="font-size:9px;color:var(--cyan);margin-left:auto;">▶ show</span>
           </div>
           <div id="trends-panel"
                style="flex-shrink:0;padding:6px 8px;background:var(--bg);
                       border-bottom:1px solid var(--border);overflow:hidden;
-                      transition:max-height .2s ease;max-height:155px;">
-            <!-- Seed button row -->
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                        margin-bottom:5px;">
-              <span style="font-size:8px;color:var(--text3);" id="trends-status">
-                กด Seed เพื่อเริ่มเก็บข้อมูล
-              </span>
+                      transition:max-height .2s ease;max-height:0px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+              <span style="font-size:8px;color:var(--text3);" id="trends-status">กด Seed เพื่อเริ่มเก็บข้อมูล</span>
               <button id="trends-seed-btn" onclick="seedMemory()"
                 style="padding:2px 8px;background:var(--panel2);border:1px solid var(--border);
-                       border-radius:4px;color:var(--cyan);font-size:9px;
-                       font-family:'Rajdhani',sans-serif;font-weight:700;
-                       cursor:pointer;letter-spacing:.5px;transition:.15s;"
+                       border-radius:4px;color:var(--cyan);font-size:9px;font-family:'Rajdhani',sans-serif;
+                       font-weight:700;cursor:pointer;letter-spacing:.5px;transition:.15s;"
                 onmouseover="this.style.borderColor='var(--cyan)'"
-                onmouseout="this.style.borderColor='var(--border)'">
-                🌱 Seed Now
-              </button>
+                onmouseout="this.style.borderColor='var(--border)'">🌱 Seed</button>
             </div>
-            <div id="trends-grid"
-                 style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-              <div style="color:var(--text3);font-size:9px;grid-column:1/-1;text-align:center;
-                          padding:6px 0;" id="trends-loading">
-                ⏳ กำลังโหลด...
-              </div>
+            <div id="trends-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+              <div style="color:var(--text3);font-size:9px;grid-column:1/-1;text-align:center;padding:6px 0;" id="trends-loading">⏳ กำลังโหลด...</div>
             </div>
           </div>
 
-          <!-- Agent Chat — flex:1 เต็มพื้นที่ที่เหลือ -->
-          <div class="ph" style="flex-shrink:0;">
-            💬 Agent Chat
-            <span id="chat-live" style="font-size:9px;color:var(--green);margin-left:auto;">● live</span>
+          <!-- ── Agent Activity Log (collapsible, ซ่อนเริ่มต้น) ── -->
+          <div class="ph" style="cursor:pointer;flex-shrink:0;user-select:none;font-size:10px;"
+               onclick="toggleActivityLog()">
+            📡 Activity Log
+            <span id="activity-toggle" style="font-size:9px;color:var(--text3);margin-left:auto;">▶ show</span>
+            <span id="chat-live" style="font-size:8px;color:var(--green);margin-left:6px;">● live</span>
           </div>
-          <div class="chatlog" id="chatlog" style="flex:1;"></div>
+          <div id="chatlog-wrap" style="flex-shrink:0;max-height:0px;overflow:hidden;
+                transition:max-height .2s ease;">
+            <div class="chatlog" id="chatlog" style="max-height:120px;"></div>
+          </div>
 
-          <!-- Agent Detail (collapsible, bottom) -->
-          <div class="ph" style="border-top:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="toggleDetPanel()">
+          <!-- ── Agent Detail (collapsible) ── -->
+          <div class="ph" style="border-top:1px solid var(--border);cursor:pointer;flex-shrink:0;font-size:10px;" onclick="toggleDetPanel()">
             🤖 Agent Detail
             <span id="det-toggle" style="font-size:10px;color:var(--text2);margin-left:auto;">▼</span>
           </div>
-          <div class="det" id="det" style="flex-shrink:0;max-height:180px;overflow-y:auto;">
+          <div class="det" id="det" style="flex-shrink:0;max-height:140px;overflow-y:auto;">
             <div style="color:var(--text3);font-size:10px;text-align:center;padding:12px;">คลิก agent เพื่อดูรายละเอียด</div>
           </div>
 
@@ -975,29 +1035,158 @@ function buildSelectors() {
   document.getElementById('con-agent').innerHTML = opts;
 }
 
-async function doSend(agentSel, inputEl, respEl) {
-  const agent = document.getElementById(agentSel).value;
-  const inp = document.getElementById(inputEl);
-  const task = inp.value.trim();
-  if (!task) return;
-  inp.value = '';
-  const resp = document.getElementById(respEl);
-  resp.style.display = 'block';
-  resp.textContent = 'Sending...';
-  try {
-    const r = await fetch('/api/agent', {
-      method: 'POST', headers: {'Content-Type':'application/json', ...AUTH_HEADERS},
-      body: JSON.stringify({agent, task})
-    });
-    const d = await r.json();
-    resp.textContent = d.response || d.error || JSON.stringify(d);
-  } catch(e) { resp.textContent = 'Error: ' + e.message; }
+// ── Chat bubble helpers ───────────────────────────────────────────────────────
+function _now12h() {
+  return new Date().toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'});
 }
 
-document.getElementById('cmd-run').addEventListener('click', () => doSend('cmd-agent','cmd-input','cmd-resp'));
-document.getElementById('cmd-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSend('cmd-agent','cmd-input','cmd-resp'); });
-document.getElementById('con-run').addEventListener('click', () => doSend('con-agent','con-input','console-resp'));
-document.getElementById('con-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSend('con-agent','con-input','console-resp'); });
+function addUserBubble(text) {
+  const thread = document.getElementById('chat-thread');
+  if (!thread) return;
+  const div = document.createElement('div');
+  div.className = 'chat-msg user';
+  div.innerHTML = `
+    <div class="chat-bubble">${esc(text)}</div>
+    <div class="chat-time">${_now12h()}</div>`;
+  thread.appendChild(div);
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function addThinkingBubble(agentName) {
+  const thread = document.getElementById('chat-thread');
+  if (!thread) return;
+  const id = 'thinking_' + Date.now();
+  const div = document.createElement('div');
+  div.className = 'chat-msg agent thinking';
+  div.id = id;
+  div.innerHTML = `
+    <div class="chat-agent-label" style="color:var(--text3);">${agentName}</div>
+    <div class="chat-bubble">⚙️ กำลังคิด...</div>`;
+  thread.appendChild(div);
+  thread.scrollTop = thread.scrollHeight;
+  return id;
+}
+
+function replaceThinkingBubble(thinkingId, agentName, agentColor, agentEmoji, replyText) {
+  const old = document.getElementById(thinkingId);
+  const thread = document.getElementById('chat-thread');
+  if (!thread) return;
+  const div = document.createElement('div');
+  div.className = 'chat-msg agent';
+  div.innerHTML = `
+    <div class="chat-agent-label" style="color:${agentColor};">
+      ${agentEmoji} ${agentName}
+    </div>
+    <div class="chat-bubble">${esc(replyText)}</div>
+    <div class="chat-time">${_now12h()}</div>`;
+  if (old) old.replaceWith(div);
+  else thread.appendChild(div);
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function getAgentMeta(agentId) {
+  const a = AGENTS.find(x => x.id === agentId);
+  if (a) return {name: a.name, color: a.color || 'var(--blue)', em: a.em || '🤖'};
+  if (agentId === 'rocket') return {name: 'Rocket', color: 'var(--blue)', em: '🚀'};
+  return {name: agentId, color: 'var(--blue)', em: '🤖'};
+}
+
+// ── Main send function ────────────────────────────────────────────────────────
+async function doSend(agentSel, inputEl, respEl) {
+  const agentId = document.getElementById(agentSel)?.value || 'rocket';
+  const inp     = document.getElementById(inputEl);
+  const task    = inp ? inp.value.trim() : '';
+  if (!task) return;
+
+  inp.value = '';
+  // Auto-resize textarea back
+  if (inp.tagName === 'TEXTAREA') { inp.style.height = ''; inp.rows = 2; }
+
+  const meta       = getAgentMeta(agentId);
+  const sendBtn    = document.getElementById('cmd-run');
+
+  // Disable send button during request
+  if (sendBtn) { sendBtn.disabled = true; }
+
+  // ── Show user bubble ───────────────────────────────────────────
+  addUserBubble(task);
+
+  // ── Show thinking bubble ───────────────────────────────────────
+  const thinkId = addThinkingBubble(`${meta.em} ${meta.name}`);
+
+  // ── Also update console page resp ─────────────────────────────
+  const consResp = document.getElementById(respEl);
+  if (consResp) { consResp.style.display = 'block'; consResp.textContent = 'กำลังประมวลผล...'; }
+
+  try {
+    const r = await fetch('/api/agent', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', ...AUTH_HEADERS},
+      body: JSON.stringify({agent: agentId, task})
+    });
+    const d = await r.json();
+    const reply = d.result || d.response || d.error || JSON.stringify(d);
+
+    // ── Replace thinking with actual reply bubble ──────────────
+    replaceThinkingBubble(thinkId, meta.name, meta.color, meta.em, reply);
+
+    // Also update console resp if visible
+    if (consResp) consResp.textContent = reply;
+
+  } catch(e) {
+    replaceThinkingBubble(thinkId, meta.name, meta.color, meta.em, '❌ Error: ' + e.message);
+    if (consResp) consResp.textContent = 'Error: ' + e.message;
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+// ── Update agent badge when selector changes ──────────────────────────────────
+function updateAgentBadge() {
+  const sel   = document.getElementById('cmd-agent');
+  const badge = document.getElementById('cmd-agent-badge');
+  if (!sel || !badge) return;
+  const meta = getAgentMeta(sel.value);
+  badge.textContent = `${meta.em} ${meta.name}`;
+}
+
+// ── Textarea auto-resize + Enter to send ─────────────────────────────────────
+function initChatInput() {
+  const ta = document.getElementById('cmd-input');
+  if (!ta) return;
+
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      doSend('cmd-agent', 'cmd-input', 'console-resp');
+    }
+  });
+}
+
+// ── Activity log toggle ───────────────────────────────────────────────────────
+let _activityVisible = false;
+function toggleActivityLog() {
+  _activityVisible = !_activityVisible;
+  const wrap = document.getElementById('chatlog-wrap');
+  const tog  = document.getElementById('activity-toggle');
+  if (wrap) wrap.style.maxHeight = _activityVisible ? '120px' : '0px';
+  if (tog)  tog.textContent = _activityVisible ? '▼ hide' : '▶ show';
+}
+
+document.getElementById('cmd-run').addEventListener('click',
+  () => doSend('cmd-agent', 'cmd-input', 'console-resp'));
+document.getElementById('cmd-agent').addEventListener('change', updateAgentBadge);
+
+// Console page send (unchanged)
+document.getElementById('con-run').addEventListener('click',
+  () => doSend('con-agent', 'con-input', 'console-resp'));
+document.getElementById('con-input').addEventListener('keydown',
+  e => { if (e.key === 'Enter') doSend('con-agent', 'con-input', 'console-resp'); });
 
 /* ═══════════════════════════════════════════════════
    API POLLING
@@ -2111,6 +2300,8 @@ function init() {
   buildOrgChart();
   resizeCanvas();
   playBoot();
+  initChatInput();
+  updateAgentBadge();
   // Start animation
   requestAnimationFrame(animLoop);
   // Polling intervals
@@ -2756,7 +2947,7 @@ function mobNotifyChat() {
 })();
 
 // ── KPI Trends (Historical Memory) ───────────────────────────────────────────
-let _trendsVisible = true;
+let _trendsVisible = false;   // ซ่อนเริ่มต้น — ให้ chat ได้พื้นที่เต็ม
 
 const TREND_META = {
   'survey.overall_avg':  { label:'Survey Avg',   fmt: v => v.toFixed(2)+'/4.0' },
@@ -2775,6 +2966,7 @@ function toggleTrendsPanel() {
   const tog   = document.getElementById('trends-toggle');
   if (panel) panel.style.maxHeight = _trendsVisible ? '155px' : '0px';
   if (tog)   tog.textContent = _trendsVisible ? '▼ hide' : '▶ show';
+  if (_trendsVisible) loadKpiTrends();
 }
 
 async function loadKpiTrends() {
