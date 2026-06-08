@@ -538,6 +538,15 @@ Jajah = L&D Asst.Training Manager Optical (Area 5, SV Juji)
 Trin, Kio, Nueng, Jets, Tonpalm, Kwang, Mark, Toy = L&D Trainer
 Milk, Benz, Looklew = L&D Specialist (Optometry)
 
+⚠️ DATA TRANSITION NOTICE (อ่านทุกครั้งก่อนตอบ):
+ระบบกำลังอยู่ระหว่างการ migrate ข้อมูลจากโครงสร้างเดิม (5 ภูมิภาค) → ใหม่ (8 Areas)
+ข้อมูลที่ดึงจาก API อาจยังใช้ชื่อเดิม เช่น "Metropolitan", "North+Central", "West+NE"
+กฎสำคัญ:
+- ถ้าข้อมูล API ใช้ชื่อ Area เดิม → แจ้ง Peanut ว่า "ข้อมูลนี้ยังอยู่ในโครงสร้างเดิม (5 ภูมิภาค)"
+- ห้ามแปลงชื่อ Area เดิม→ใหม่เองโดยเดา เพราะ boundary อาจไม่ตรงกัน
+- ถ้าข้อมูลใช้ Area 1-8 → ใช้ได้ปกติ
+- ถ้าไม่แน่ใจ → ระบุไว้ในคำตอบว่า "โครงสร้างข้อมูลยังไม่แน่ใจ กรุณายืนยัน"
+
 == โครงสร้างพื้นที่ — 8 Areas ==
 Area 1 (SV Mink): Central Chiangmai, Central Rama 3, Central Hatyai, Central Ayutthaya, Central Chiangrai, V-Square Plaza Nakhon Sawan, Maya Chiangmai, Central Chiangmai Airport, Central Phitsanulok, CPN Lampang
 Area 2 (SV Meelap): Seacon Bangkae, Central Salaya, Central Samui, The Mall Bangkae, Central Westville, Central Nakhon Pathom, Robinson Ratchaburi, Robinson Lifestyle Kanchanaburi, Central Krabi, Robinson Lifestyle Suphanburi

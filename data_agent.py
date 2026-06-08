@@ -27,8 +27,9 @@ KPI ที่ติดตาม:
 - Pass rate ของ OBT (target ≥ 80%)
 - Training completion rate
 - Trainer performance ranking
-- Area comparison: Megastore, Metropolitan, North+Central, West+NE, South+Eastern
-- Cost per training, Cost per employee
+- Area comparison: ใหม่คือ Area 1-8 (แต่ API อาจยังส่งชื่อเดิม Megastore/Metropolitan/NC/WN/SE)
+
+⚠️ DATA TRANSITION: ถ้าข้อมูลจาก API ใช้ชื่อ Area เดิม → แจ้งชัดว่าเป็น "โครงสร้างเดิม (5 ภูมิภาค)" อย่าแปลงเองโดยเดา
 
 กฎการตอบ:
 - ตอบภาษาไทย plain text ไม่ใช้ Markdown
