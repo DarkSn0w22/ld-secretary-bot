@@ -490,6 +490,16 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
     <div class="hs"><div class="hsv" style="color:var(--yellow)" id="h-msgs">0</div><div class="hsl">Msgs</div></div>
     <!-- Google Drive / Reports shortcuts -->
     <div style="display:flex;gap:6px;align-items:center;margin:0 8px;">
+      <button onclick="testAllSaves()" title="ทดสอบว่าทุก agent บันทึก Sheets ได้"
+        id="test-all-btn"
+        style="display:flex;align-items:center;gap:4px;padding:5px 8px;
+               background:#0a0a1a;border:1px solid #1a1a3a;border-radius:5px;
+               color:#2a3060;font-size:9px;font-family:'Rajdhani',sans-serif;
+               font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;"
+        onmouseover="this.style.borderColor='#4f9eff';this.style.color='#4f9eff'"
+        onmouseout="this.style.borderColor='#1a1a3a';this.style.color='#2a3060'">
+        🧪 Test All
+      </button>
       <button onclick="testSheets()" title="ทดสอบ Sheets connection"
         id="test-sheets-btn"
         style="display:flex;align-items:center;gap:4px;padding:5px 8px;
@@ -3041,6 +3051,86 @@ async function seedMemory() {
 // โหลด trends ตอน init + refresh ทุก 10 นาที
 setTimeout(loadKpiTrends, 2000);
 setInterval(loadKpiTrends, 10 * 60 * 1000);
+
+// ── Test All Agent Saves ─────────────────────────────────────────────────────
+const AGENT_EMOJI = {rocket:'🚀',atlas:'🎯',pulse:'📚',sage:'📋',guard:'🛡️',
+  coin:'💰',lex:'⚖️',people:'👥',pixel:'🌐',sigma:'📈',lens:'✏️',rex:'📊'};
+
+async function testAllSaves() {
+  const btn = document.getElementById('test-all-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Testing...'; }
+
+  try {
+    const r = await fetch('/api/test-all-saves', {method:'POST', headers:AUTH_HEADERS});
+    const d = await r.json();
+
+    if (d.error) { alert('❌ ' + d.error); return; }
+
+    const results  = d.results || {};
+    const tabs     = d.tabs_in_sheet || [];
+    const agents   = Object.keys(AGENT_EMOJI);
+
+    // Build popup HTML
+    let html = `<div style="font-family:'Share Tech Mono',monospace;font-size:11px;
+      background:#0a0e1a;border:1px solid #1e3060;border-radius:10px;
+      padding:18px 20px;width:420px;max-width:94vw;max-height:80vh;overflow-y:auto;">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;
+        color:#4f9eff;margin-bottom:12px;letter-spacing:1px;">
+        🧪 Agent Save Test Results
+      </div>
+      <div style="font-size:10px;color:#3a5070;margin-bottom:10px;">
+        Passed: <span style="color:#4ade80;">${d.passed}/${d.total}</span>
+        &nbsp;|&nbsp; Tabs in Sheet: ${tabs.length}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">`;
+
+    agents.forEach(id => {
+      const res = results[id] || {};
+      const ok  = res.ok;
+      const em  = AGENT_EMOJI[id] || '🤖';
+      const inSheet = tabs.map(t=>t.toLowerCase()).includes(id.charAt(0).toUpperCase()+id.slice(1).toLowerCase());
+      html += `<div style="background:${ok?'#0d1e0d':'#1e0d0d'};border:1px solid ${ok?'#1a4020':'#4a1a1a'};
+        border-radius:6px;padding:7px 9px;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span>${em}</span>
+          <span style="font-family:'Rajdhani',sans-serif;font-weight:700;
+            color:${ok?'#4ade80':'#ff5c5c'};">${id.toUpperCase()}</span>
+          <span style="margin-left:auto;font-size:10px;">${ok?'✅':'❌'}</span>
+        </div>
+        <div style="font-size:9px;color:${ok?'#3a6040':'#6a3030'};margin-top:2px;">
+          Tab: ${res.tab||'—'} ${inSheet?'📋':''}
+          ${res.error?'<br>'+res.error.slice(0,40):''}
+        </div>
+      </div>`;
+    });
+
+    html += `</div>`;
+    if (tabs.length) {
+      html += `<div style="font-size:9px;color:#3a5070;margin-bottom:10px;">
+        <span style="color:#4a6080;">Tabs ใน Sheet:</span> ${tabs.join(', ')}
+      </div>`;
+    }
+    html += `<div style="text-align:center;">
+      <button onclick="document.getElementById('test-all-modal').remove()"
+        style="padding:6px 20px;background:var(--panel);border:1px solid var(--border);
+          border-radius:5px;color:var(--text2);cursor:pointer;font-size:11px;">
+        ปิด
+      </button>
+    </div></div>`;
+
+    let modal = document.createElement('div');
+    modal.id = 'test-all-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);';
+    modal.innerHTML = html;
+    modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+    document.body.appendChild(modal);
+
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '🧪 Test All'; }
+  }
+}
 
 // ── Test Sheets ──────────────────────────────────────────────────────────────
 async function testSheets() {

@@ -1156,6 +1156,59 @@ def api_sync_memory():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/test-all-saves", methods=["POST"])
+def api_test_all_saves():
+    """ทดสอบว่าทุก agent บันทึก Sheets ได้จริง — เขียน test row ทุกตัวพร้อมกัน"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        import threading as _thr
+        from drive_api import save_report
+
+        ALL_AGENTS = ["rocket","atlas","pulse","sage","guard","coin","lex","people","pixel","sigma","lens","rex"]
+        now_str    = datetime.now().strftime("%Y-%m-%d %H:%M")
+        results    = {}
+        lock       = _thr.Lock()
+
+        def _test_one(agent_id):
+            try:
+                res = save_report(agent_id, f"[System Test] {now_str}", f"✅ Test write from {agent_id} at {now_str}")
+                with lock:
+                    results[agent_id] = {"ok": res.get("ok", False), "tab": res.get("tab",""), "url": res.get("url",""), "error": res.get("error","")}
+            except Exception as e:
+                with lock:
+                    results[agent_id] = {"ok": False, "error": str(e)}
+
+        threads = [_thr.Thread(target=_test_one, args=(a,), daemon=True) for a in ALL_AGENTS]
+        for t in threads: t.start()
+        for t in threads: t.join(timeout=20)
+
+        # ตรวจ tab ที่มีอยู่จริงใน sheet
+        tabs_in_sheet = []
+        try:
+            from drive_api import _get_gspread, REPORTS_SHEET_ID as SID
+            gc = _get_gspread()
+            if gc and SID:
+                ss   = gc.open_by_key(SID)
+                tabs_in_sheet = [ws.title for ws in ss.worksheets()]
+        except Exception:
+            pass
+
+        passed  = [a for a, r in results.items() if r.get("ok")]
+        failed  = [a for a, r in results.items() if not r.get("ok")]
+        log_agent("dashboard", "sheets", f"test-all-saves: {len(passed)}/{len(ALL_AGENTS)} passed", str(failed))
+
+        return jsonify({
+            "total":   len(ALL_AGENTS),
+            "passed":  len(passed),
+            "failed":  len(failed),
+            "results": results,
+            "tabs_in_sheet": tabs_in_sheet,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/test-sheets", methods=["POST"])
 def api_test_sheets():
     """ทดสอบ Google Sheets connection + write — กดจาก Dashboard เพื่อ diagnose"""
