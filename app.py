@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import base64
 from datetime import datetime
+import re
 from flask import Flask, request, abort, jsonify, send_file, Response
 import anthropic
 from models_config import get_model
@@ -50,6 +51,28 @@ DASHBOARD_TOKEN = os.getenv("DASHBOARD_TOKEN", "")  # ถ้าเว้นว�
 PEANUT_USER_ID = os.getenv("PEANUT_USER_ID", "U668b7978706b2feaf61d071cc0080177")
 
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+REPORTS_SHEET_ID = os.getenv("REPORTS_SHEET_ID", "1wXZI3aXj21ZkhcJgUA4lD5BewjzridVtbHaNeNgnxJQ")
+DRIVE_FOLDER_ID  = os.getenv("DRIVE_FOLDER_ID",  "1m4IHMoxU0Wj_tBP8W90ql2JJewkP7kEM")
+
+# ── Strip Markdown ─────────────────────────────────────────────────────────────
+_MD_PATTERNS = [
+    (re.compile(r'\*\*(.+?)\*\*', re.S), r'\1'),      # **bold**
+    (re.compile(r'\*(.+?)\*',     re.S), r'\1'),      # *italic*
+    (re.compile(r'__(.+?)__',     re.S), r'\1'),      # __bold__
+    (re.compile(r'_(.+?)_',       re.S), r'\1'),      # _italic_
+    (re.compile(r'`{1,3}(.+?)`{1,3}', re.S), r'\1'), # `code`
+    (re.compile(r'^#{1,6}\s+', re.M), ''),            # ## headers
+    (re.compile(r'^>\s+', re.M), ''),                 # > blockquote
+    (re.compile(r'\[(.+?)\]\(.+?\)'), r'\1'),         # [link](url)
+    (re.compile(r'^\s*[-*+]\s+', re.M), '• '),        # - bullet → •
+]
+
+def strip_markdown(text: str) -> str:
+    """ลบ Markdown syntax ออกจากข้อความ — plain text เท่านั้น"""
+    for pattern, repl in _MD_PATTERNS:
+        text = pattern.sub(repl, text)
+    return text.strip()
 
 # Init DB on startup
 init_db()
@@ -228,13 +251,75 @@ TOOLS = [
             },
             "required": ["task"]
         }
+    },
+    {
+        "name": "write_to_sheets",
+        "description": "บันทึกรายงาน/ผลงาน/ข้อมูลลง Google Sheets (OWNDAYS AI Reports) — ใช้เมื่อต้องการเก็บผลการวิเคราะห์ รายงาน หรือข้อมูลสำคัญ",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tab_name": {
+                    "type": "string",
+                    "description": "ชื่อ tab/แผนก เช่น rocket, rex, pulse, coin, atlas, lens (จะเป็นชื่อ sheet tab)"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "หัวเรื่องรายงาน เช่น 'Sales Analysis สัปดาห์ 22', 'Training Plan Q3'"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "เนื้อหาทั้งหมดที่ต้องการบันทึก"
+                }
+            },
+            "required": ["tab_name", "title", "content"]
+        }
+    },
+    {
+        "name": "create_drive_file",
+        "description": "สร้างไฟล์ text/report ใน Google Drive folder ของ OWNDAYS L&D AI — ใช้เมื่อต้องการสร้างเอกสาร action plan, proposal, หรือ report ที่ต้องแชร์",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string",
+                    "description": "ชื่อไฟล์ เช่น 'Action_Plan_Branch_WN_Jun2026.txt'"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "เนื้อหาของไฟล์"
+                },
+                "subfolder": {
+                    "type": "string",
+                    "description": "ชื่อโฟลเดอร์ย่อย (optional) เช่น 'Reports', 'Action Plans', 'Training'"
+                }
+            },
+            "required": ["filename", "content"]
+        }
     }
 ]
 
 
+def _auto_save_to_sheets(agent_id: str, task: str, result: str):
+    """Auto-save agent result to Sheets in background (ไม่บล็อก)"""
+    if not result or len(result) < 50:
+        return   # ข้อความสั้นเกินไป ไม่ต้องบันทึก
+    import threading
+    def _save():
+        try:
+            from drive_api import save_report
+            res = save_report(agent_id, task[:150], result)
+            if res.get("ok"):
+                print(f"[AutoSave] {agent_id} → Sheets ✅")
+            else:
+                print(f"[AutoSave] {agent_id} failed: {res.get('error','')}")
+        except Exception as e:
+            print(f"[AutoSave] error: {e}")
+    threading.Thread(target=_save, daemon=True).start()
+
+
 def execute_tool(tool_name, tool_input):
     """Route tool call → agent bus (หรือ direct call สำหรับ data tools)"""
-    # ── Data tools: เรียกตรงเพราะไม่ใช่ AI agent ──
+    # ── Data tools ──────────────────────────────────────────────────
     if tool_name == "get_survey_data":
         return get_survey_summary()
     elif tool_name == "get_oar_data":
@@ -246,25 +331,65 @@ def execute_tool(tool_name, tool_input):
     elif tool_name == "web_search":
         return google_search(tool_input.get("query", ""))
 
-    # ── AI Agent tools: ส่งผ่าน bus (มี queue + worker thread) ──
+    # ── write_to_sheets ──────────────────────────────────────────────
+    elif tool_name == "write_to_sheets":
+        try:
+            from drive_api import save_report
+            tab   = tool_input.get("tab_name", "rocket")
+            title = tool_input.get("title", "รายงาน")
+            body  = tool_input.get("content", "")
+            res   = save_report(tab, title, body)
+            if res.get("ok"):
+                url = res.get("url", "")
+                log_agent("rocket", "sheets", f"saved: {title[:80]}", url)
+                return (f"✅ บันทึกลง Google Sheets สำเร็จครับ\n"
+                        f"Tab: {res.get('tab','?')}\n"
+                        f"Link: {url}")
+            else:
+                return f"❌ บันทึกไม่สำเร็จ: {res.get('error','unknown')}"
+        except Exception as e:
+            return f"❌ write_to_sheets error: {e}"
+
+    # ── create_drive_file ────────────────────────────────────────────
+    elif tool_name == "create_drive_file":
+        try:
+            filename  = tool_input.get("filename", "report.txt")
+            content   = tool_input.get("content", "")
+            subfolder = tool_input.get("subfolder", "")
+
+            # ใช้ Sheets บันทึกเป็น tab แทน Drive file (service account quota issue)
+            from drive_api import save_report
+            tab_name = subfolder or "drive_files"
+            res = save_report(tab_name, filename, content)
+            if res.get("ok"):
+                url = res.get("url", "")
+                log_agent("rocket", "drive", f"file: {filename}", url)
+                return (f"✅ สร้างไฟล์ '{filename}' สำเร็จครับ\n"
+                        f"บันทึกใน Google Sheets tab '{res.get('tab','?')}'\n"
+                        f"Link: {url}")
+            else:
+                return f"❌ สร้างไฟล์ไม่สำเร็จ: {res.get('error','unknown')}"
+        except Exception as e:
+            return f"❌ create_drive_file error: {e}"
+
+    # ── AI Agent tools ───────────────────────────────────────────────
     AGENT_TOOL_MAP = {
-        "ask_manager":       ("atlas",  lambda i: i.get("task", "")),
-        "ask_trainer_manager": ("pulse", lambda i: i.get("task", "")),
-        "ask_reporter":      ("sage",   lambda i: i.get("report_type", "weekly")),
-        "ask_reviewer":      ("guard",  lambda i: i.get("content", "")),
-        "ask_financial":     ("coin",   lambda i: i.get("task", "")),
-        "ask_legal":         ("lex",    lambda i: i.get("task", "")),
-        "ask_hr":            ("people", lambda i: i.get("task", "")),
-        "ask_web_admin":     ("pixel",  lambda i: i.get("task", "")),
-        "ask_data_analyst":  ("sigma",  lambda i: i.get("task", "")),
-        "ask_creator":       ("lens",   lambda i: i.get("task", "")),
-        "ask_retail_md":     ("rex",    lambda i: i.get("task", "")),
+        "ask_manager":         ("atlas",  lambda i: i.get("task", "")),
+        "ask_trainer_manager": ("pulse",  lambda i: i.get("task", "")),
+        "ask_reporter":        ("sage",   lambda i: i.get("report_type", "weekly")),
+        "ask_reviewer":        ("guard",  lambda i: i.get("content", "")),
+        "ask_financial":       ("coin",   lambda i: i.get("task", "")),
+        "ask_legal":           ("lex",    lambda i: i.get("task", "")),
+        "ask_hr":              ("people", lambda i: i.get("task", "")),
+        "ask_web_admin":       ("pixel",  lambda i: i.get("task", "")),
+        "ask_data_analyst":    ("sigma",  lambda i: i.get("task", "")),
+        "ask_creator":         ("lens",   lambda i: i.get("task", "")),
+        "ask_retail_md":       ("rex",    lambda i: i.get("task", "")),
     }
     if tool_name in AGENT_TOOL_MAP:
         agent_id, get_task = AGENT_TOOL_MAP[tool_name]
         task = get_task(tool_input)
         if bus.is_registered(agent_id):
-            # ส่งผ่าน bus แบบ sync-wait (Claude tool loop ต้องการผล)
             result_holder = [None]
             ev = __import__("threading").Event()
             def _cb(aid, result, error):
@@ -272,17 +397,21 @@ def execute_tool(tool_name, tool_input):
                 ev.set()
             bus.send("rocket", agent_id, task, _cb)
             ev.wait(timeout=90)
-            return result_holder[0] or "ไม่ได้รับผลลัพธ์ภายใน 90 วินาที"
-        # fallback ถ้า bus ยังไม่พร้อม
-        direct = {
-            "atlas": run_manager, "pulse": run_trainer_manager,
-            "sage": run_reporter, "guard": run_reviewer,
-            "coin": run_financial_manager, "lex": run_legal_manager,
-            "people": run_hr_manager, "pixel": run_web_admin,
-            "sigma": run_data_analyst, "lens": run_creator,
-            "rex": run_retail_md,
-        }
-        return direct[agent_id](task) if agent_id in direct else "Agent ไม่พร้อม"
+            result = result_holder[0] or "ไม่ได้รับผลลัพธ์ภายใน 90 วินาที"
+        else:
+            direct = {
+                "atlas": run_manager, "pulse": run_trainer_manager,
+                "sage": run_reporter, "guard": run_reviewer,
+                "coin": run_financial_manager, "lex": run_legal_manager,
+                "people": run_hr_manager, "pixel": run_web_admin,
+                "sigma": run_data_analyst, "lens": run_creator,
+                "rex": run_retail_md,
+            }
+            result = direct[agent_id](task) if agent_id in direct else "Agent ไม่พร้อม"
+
+        # ── Auto-save agent result to Sheets ────────────────────────
+        _auto_save_to_sheets(agent_id, task, result)
+        return result
 
     return "ไม่พบ tool นี้"
 
@@ -313,13 +442,17 @@ def execute_tools_parallel(tool_blocks: list) -> list:
 # =============================================================
 SECRETARY_PROMPT = """คุณคือ "Rocket" — AI เลขาส่วนตัวของ Peanut ผู้ชาย ทำงานให้ตลอด 24 ชั่วโมง
 
-⚠️ กฎเหล็กที่ต้องทำตามเสมอ:
-1. ห้ามใช้ Markdown เด็ดขาด — ห้ามใช้ ** ## __ ``` > - (bullet) เด็ดขาด ใช้ plain text + emoji เท่านั้น
+🚫 กฎเหล็กที่ต้องทำตามเสมอ — ห้ามละเมิดเด็ดขาด:
+1. ห้ามใช้ Markdown ทุกชนิด — ห้ามใช้ ** ## __ ``` > --- * (bullet) เด็ดขาดที่สุด
+   ใช้ plain text + emoji เท่านั้น ถ้าใช้ ** จะถูกลบทิ้งโดยระบบ
 2. ใช้คำลงท้าย "ครับ" เสมอ ห้ามใช้ "ค่ะ" หรือ "นะคะ" เด็ดขาด
 3. คุณมี tools เรียก agent ได้จริง — ถ้า Peanut สั่งงานใด ให้เรียก tool ทันที อย่าบอกว่า "ทำไม่ได้"
+4. คุณเขียน Google Sheets และ Google Drive ได้ — ใช้ tool write_to_sheets และ create_drive_file
 
 == การกระจายงานและประสานงาน Agent ==
 คุณเป็น Orchestrator — คุณสามารถเรียก Agent อื่นๆ ผ่าน tools ได้เลยทันที:
+ระบบบันทึกทุกรายงานลง Google Sheets อัตโนมัติหลัง agent ตอบกลับ
+คุณสามารถใช้ write_to_sheets บันทึกเพิ่มเติมได้ตลอดเวลา ไม่ต้องถามก่อน
 
 ask_manager → Atlas (วิเคราะห์เชิงลึก วางแผนกลยุทธ์ ประสานงาน)
 ask_trainer_manager → Pulse (ติดตาม trainer KPI วิเคราะห์หลักสูตร)
@@ -332,6 +465,8 @@ ask_web_admin → Pixel (เว็บไซต์ od-connect.com)
 ask_data_analyst → Sigma (วิเคราะห์ข้อมูล trends KPI)
 ask_creator → Lens (สร้าง content quiz script)
 ask_retail_md → Rex (sales สาขา branch performance)
+write_to_sheets → บันทึกลง Google Sheets (tab ตามชื่อแผนก)
+create_drive_file → สร้างไฟล์ใน Google Drive (action plan, report)
 
 เมื่อ Peanut บอก "ให้ [agent] ทำ..." หรือ "กระจายงาน" หรือ "ให้แต่ละแผนก..." ให้:
 - เรียก tool ที่เกี่ยวข้องทันที (เรียกหลาย tool ต่อเนื่องได้)
@@ -432,9 +567,14 @@ API Actions: action=survey, cost, asset, oar, ping, all (ใส่ year filter �
 == สาขาทั้งหมด ==
 MEGA Bangna, Zpell @ Future Park, Central Eastville, Seacon Bangkae, Seacon Square, Fashion Island, The Mall Korat, Central Udon, Central Chiangmai, Gaysorn Village Premium Store, Central Mahachai, Central Phuket, Central Westgate, CentralWorld, Terminal 21 Pattaya, ICONSIAM, Gateway Bangsue, Donki Mall Thonglor, Central Rama 3, Central Village (Outlet), Central Hatyai, Central Rayong, Siam Premium Outlets, Siam Center, Central Salaya, Central Pinklao, Central Rama 2, Central Si Racha, Central Ayutthaya, Central Khonkaen, Central Chanthaburi, Terminal 21 Rama 3, Central Ramindra, Central Chiangrai, Central Samui, Central Nakhon Si, Marche Thonglor, Park Silom, The Mall Bangkae, Central Westville, Central Nakhon Pathom, True Digital Park, V-Square Plaza Nakhon Sawan, Makro Sri Ayutthaya, Central Rama 9, One Bangkok, Robinson Ratchaburi, Market Village Huahin, Lotus's Mall Makro Sathon, Robinson Lifestyle Kanchanaburi, Esplanade Ratchada, Charn At The Avenue, Siam Square One, Robinson Latkrabang, The Mall Bang Kapi, Maya Chiangmai, Robinson Lifestyle Chachoengsao, Central Chiangmai Airport, Central Krabi, Outlet Square Muang Thong Thani, Robinson Lifestyle Saraburi, Robinson Lifestyle Trang, Robinson Lifestyle Chonburi, Robinson Lifestyle Suphanburi, Robinson Lifestyle Buriram, The Glass Market Bangna, Imperial Samrong, Central Phitsanulok, Robinson Suphanburi, Central Lampang, Central Khonkaen Campus, Central Surat Thani, Central Northville, Happitat Bangna, Central Chaengwattana, Robinson Prachinburi, Robinson Phetchaburi, Central Park, The Central Phaholyothin และอื่นๆในอนาคต
 
-== สิ่งที่ยังทำไม่ได้ (แจ้งตรงๆ) ==
+== สิ่งที่ยังทำไม่ได้ ==
 - เช็ค/ส่ง Email @owndays.com (ต้องรอ IT อนุมัติ)
 - เช็ค Google Calendar (กำลังพัฒนา)
+
+== สิ่งที่ทำได้ (อย่าบอกว่าทำไม่ได้เด็ดขาด) ==
+- เขียนลง Google Sheets → ใช้ write_to_sheets ได้เลย
+- สร้างไฟล์ใน Google Drive → ใช้ create_drive_file ได้เลย
+- บันทึกทุก agent response → ระบบทำอัตโนมัติอยู่แล้ว
 
 เมื่อต้องค้นหาข้อมูลจากอินเทอร์เน็ต ให้ใช้ web_search tool ได้เลย ไม่ต้องพึ่ง agent อื่น
 """
@@ -491,8 +631,15 @@ def get_claude_response(user_id: str, message: str) -> str:
                 if hasattr(block, "text"):
                     final_text += block.text
 
+            # ── Strip Markdown (backup enforcement) ───────────────
+            final_text = strip_markdown(final_text)
+
             save_message(user_id, "assistant", final_text)
             log_agent("rocket", "user", "", final_text[:200])
+
+            # ── Auto-save Rocket's final response to Sheets ───────
+            _auto_save_to_sheets("rocket", message[:150], final_text)
+
             return final_text
 
     except Exception as e:
