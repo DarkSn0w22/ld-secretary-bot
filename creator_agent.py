@@ -7,6 +7,7 @@ import os
 import anthropic
 from models_config import get_model
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -57,7 +58,7 @@ LENS_TOOLS = [
             "required": ["query"]
         }
     }
-]
+] + SAVE_TOOLS
 
 COURSE_CONTEXT = {
     "OTT": "Orientation Training — แนะนำบริษัท, วัฒนธรรม OWNDAYS, กฎระเบียบ",
@@ -73,6 +74,10 @@ COURSE_CONTEXT = {
 
 
 def execute_lens_tool(tool_name, tool_input):
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="lens")
+    if result is not None:
+        return result
     if tool_name == "research_topic":
         topic = tool_input.get("topic", "")
         course_hint = ""
@@ -104,7 +109,9 @@ def run_creator(task, context=""):
                                         "content": execute_lens_tool(block.name, block.input)})
                 messages.append({"role": "user", "content": results})
                 continue
-            return "".join(b.text for b in response.content if hasattr(b, "text"))
+            final_text = "".join(b.text for b in response.content if hasattr(b, "text"))
+            auto_save("lens", task, final_text)
+            return final_text
         return "Lens ใช้เวลานานเกินไปครับ"
     except Exception as e:
         return f"Lens มีปัญหาชั่วคราวครับ: {str(e)}"

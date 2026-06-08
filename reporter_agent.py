@@ -9,6 +9,7 @@ import anthropic
 from models_config import get_model
 import requests
 from dashboard_api import get_all_dashboard
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
@@ -105,6 +106,7 @@ def run_reporter(task: str = "weekly") -> str:
     except Exception:
         pass
 
+    auto_save("sage", task, report)
     return report
 
 

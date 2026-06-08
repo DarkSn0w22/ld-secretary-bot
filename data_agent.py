@@ -8,6 +8,7 @@ import anthropic
 from models_config import get_model
 from dashboard_api import get_all_dashboard, fetch_dashboard
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -62,10 +63,14 @@ SIGMA_TOOLS = [
             "required": ["metric"]
         }
     }
-]
+] + SAVE_TOOLS
 
 
 def execute_sigma_tool(tool_name, tool_input):
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="sigma")
+    if result is not None:
+        return result
     if tool_name == "get_full_data":
         return get_all_dashboard()
     elif tool_name == "get_area_comparison":
@@ -105,7 +110,9 @@ def run_data_analyst(task, context=""):
                                         "content": execute_sigma_tool(block.name, block.input)})
                 messages.append({"role": "user", "content": results})
                 continue
-            return "".join(b.text for b in response.content if hasattr(b, "text"))
+            final_text = "".join(b.text for b in response.content if hasattr(b, "text"))
+            auto_save("sigma", task, final_text)
+            return final_text
         return "Sigma ใช้เวลานานเกินไปครับ"
     except Exception as e:
         return f"Sigma มีปัญหาชั่วคราวครับ: {str(e)}"

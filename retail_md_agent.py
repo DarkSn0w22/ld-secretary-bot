@@ -13,6 +13,7 @@ import anthropic
 from models_config import get_model
 from dashboard_api import get_survey_dashboard, get_oar_dashboard, get_area_dashboard
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
@@ -212,12 +213,16 @@ REX_TOOLS = [
             "required": ["query"]
         }
     }
-]
+] + SAVE_TOOLS
 
 # =============================================================
 # TOOL EXECUTION
 # =============================================================
 def execute_rex_tool(name: str, inputs: dict) -> str:
+    # ── Save tools (shared) ──────────────────────────────────────
+    save_result = execute_save_tool(name, inputs, agent_id="rex")
+    if save_result is not None:
+        return save_result
     try:
         if name == "parse_sales_file":
             return _parse_sales_file(
@@ -409,6 +414,8 @@ def run_retail_md(task: str, context: str = "", sales_file_content: str = "") ->
             except Exception:
                 pass
 
+            # Auto-save to Google Sheets
+            auto_save("rex", task, result_text)
             return result_text
 
         return "Rex ทำงานเสร็จสิ้นครับ"

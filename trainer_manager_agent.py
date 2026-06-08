@@ -9,6 +9,7 @@ import anthropic
 from models_config import get_model
 from dashboard_api import get_survey_dashboard, get_oar_dashboard, get_area_dashboard, get_assessment_dashboard, get_cost_dashboard
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -101,10 +102,14 @@ PULSE_TOOLS = [
             "required": ["query"]
         }
     }
-]
+] + SAVE_TOOLS
 
 
 def execute_pulse_tool(tool_name, tool_input):
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="pulse")
+    if result is not None:
+        return result
     if tool_name == "get_survey":
         return get_survey_dashboard()
     elif tool_name == "get_oar":
@@ -163,6 +168,7 @@ def run_trainer_manager(task, context=""):
                     final_text += block.text
 
             print("Pulse completed task")
+            auto_save("pulse", task, final_text)
             return final_text
 
         return "Pulse ใช้เวลาวิเคราะห์นานเกินไปครับ ลองถามเจาะจงกว่านี้ได้ไหมครับ"

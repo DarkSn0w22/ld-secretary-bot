@@ -6,6 +6,7 @@ Reviewer/QA AI — "Guard"
 import os
 import anthropic
 from models_config import get_model
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -71,6 +72,7 @@ def run_reviewer(content: str, content_type: str = "report", context: str = "") 
         )
         result = response.content[0].text
         print("Guard review completed")
+        auto_save("guard", content_type, result)
         return result
     except Exception as e:
         print(f"Guard Error: {e}")

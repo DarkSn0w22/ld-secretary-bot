@@ -10,6 +10,7 @@ from models_config import get_model
 import requests
 from dashboard_api import get_cost_dashboard, fetch_dashboard
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
@@ -76,7 +77,7 @@ COIN_TOOLS = [
             "required": ["query"]
         }
     }
-]
+] + SAVE_TOOLS
 
 
 def get_financial_page() -> str:
@@ -163,6 +164,10 @@ def push_budget_alert(alerts: list):
 _alert_sent_date = None
 
 def execute_coin_tool(tool_name, tool_input):
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="coin")
+    if result is not None:
+        return result
     global _alert_sent_date
     if tool_name == "get_cost_data":
         raw = fetch_dashboard("cost")
@@ -244,6 +249,7 @@ def run_financial_manager(task, context=""):
                 if hasattr(block, "text"):
                     final_text += block.text
             print("Coin completed")
+            auto_save("coin", task, final_text)
             return final_text
 
         return "Coin ใช้เวลานานเกินไปครับ ลองถามใหม่แบบเจาะจงกว่านี้ได้ครับ"

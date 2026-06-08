@@ -8,6 +8,7 @@ import anthropic
 from models_config import get_model
 import requests
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -74,7 +75,7 @@ PIXEL_TOOLS = [
             "required": ["query"]
         }
     }
-]
+] + SAVE_TOOLS
 
 IMPORTANT_PAGES = [
     "https://www.od-connect.com/",
@@ -113,6 +114,10 @@ def get_page_text(url: str, max_chars: int = 2000) -> str:
 
 
 def execute_pixel_tool(tool_name, tool_input):
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="pixel")
+    if result is not None:
+        return result
     if tool_name == "check_page_status":
         result = check_page(tool_input.get("url", ""))
         icon = "✅" if result["ok"] else "❌"
@@ -159,7 +164,9 @@ def run_web_admin(task, context=""):
                                         "content": execute_pixel_tool(block.name, block.input)})
                 messages.append({"role": "user", "content": results})
                 continue
-            return "".join(b.text for b in response.content if hasattr(b, "text"))
+            final_text = "".join(b.text for b in response.content if hasattr(b, "text"))
+            auto_save("pixel", task, final_text)
+            return final_text
         return "Pixel ใช้เวลานานเกินไปครับ"
     except Exception as e:
         return f"Pixel มีปัญหาชั่วคราวครับ: {str(e)}"

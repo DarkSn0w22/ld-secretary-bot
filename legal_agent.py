@@ -8,6 +8,7 @@ import os
 import anthropic
 from models_config import get_model
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -76,10 +77,14 @@ LEX_TOOLS = [
             "required": ["document"]
         }
     }
-]
+] + SAVE_TOOLS
 
 
 def execute_lex_tool(tool_name, tool_input):
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="lex")
+    if result is not None:
+        return result
     if tool_name == "search_thai_law":
         query = tool_input.get("query", "") + " กฎหมายไทย labor law Thailand"
         return google_search(query)
@@ -133,6 +138,7 @@ def run_legal_manager(task, context=""):
                 if hasattr(block, "text"):
                     final_text += block.text
             print("Lex completed")
+            auto_save("lex", task, final_text)
             return final_text
 
         return "Lex ใช้เวลานานเกินไปครับ ลองถามใหม่แบบเจาะจงกว่านี้"

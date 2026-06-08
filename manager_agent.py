@@ -9,6 +9,7 @@ import anthropic
 from models_config import get_model
 from dashboard_api import get_survey_dashboard, get_oar_dashboard, get_area_dashboard, get_cost_dashboard, get_all_dashboard
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 
@@ -92,10 +93,14 @@ MANAGER_TOOLS = [
             "required": ["focus_area"]
         }
     }
-]
+] + SAVE_TOOLS
 
 
 def execute_manager_tool(tool_name: str, tool_input: dict) -> str:
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="atlas")
+    if result is not None:
+        return result
     if tool_name == "web_search":
         return google_search(tool_input.get("query", ""))
     elif tool_name == "get_survey_data":
@@ -154,6 +159,7 @@ def run_manager(task: str, context: str = "") -> str:
                     final_text += block.text
 
             print(f"Manager completed task")
+            auto_save("atlas", task, final_text)
             return final_text
 
     except Exception as e:

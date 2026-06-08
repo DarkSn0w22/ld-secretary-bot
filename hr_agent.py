@@ -14,6 +14,7 @@ import json
 import base64
 import requests
 from google_search import google_search
+from agent_save_tools import SAVE_TOOLS, execute_save_tool, auto_save
 
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
@@ -99,7 +100,7 @@ PEOPLE_TOOLS = [
             "required": ["keyword"]
         }
     }
-]
+] + SAVE_TOOLS
 
 
 def get_gspread_client():
@@ -194,6 +195,10 @@ def push_line_message(text: str):
 
 
 def execute_people_tool(tool_name, tool_input):
+    # ── Save tools (shared) ──────────────────────────────────────
+    result = execute_save_tool(tool_name, tool_input, agent_id="people")
+    if result is not None:
+        return result
     if tool_name == "get_all_employees":
         employees = get_sheet_data("Employee")
         return format_employees_summary(employees)
@@ -313,6 +318,7 @@ def run_hr_manager(task, context=""):
                 if hasattr(block, "text"):
                     final_text += block.text
             print("People completed")
+            auto_save("people", task, final_text)
             return final_text
 
         return "People ใช้เวลานานเกินไปครับ ลองถามใหม่แบบเจาะจงกว่านี้"
