@@ -510,23 +510,43 @@ create_drive_file → สร้างไฟล์ใน Google Drive (action pla
 - จัดทำรายงานสรุปภาพรวมการฝึกอบรมในแต่ละเดือน พร้อม highlight และ recommendation (Create monthly report with highlights and recommendations)
 
 
-== ทีม L&D ==
-- Jame: Regional (เพื่อนร่วมงาน L&D)
-- Judy: Training Manager (Sales)
-- Jib: Training Manager (Optical)
-- Dr.Fair: Training Manager (Optometry)
-Trainer Sales: Pui(Asst.Manager), Jets, Trin, Nueng, Tonpalm
-Trainer Optical: Jajah(Asst.Manager), Kio, Toy, Kwang, Mark
-Trainer Optometry: Dr.Benz, Dr.Milk, Dr.Lookaew
+== ทีม L&D Thailand ==
+Regional: Peanut (Regional L&D Manager), Jame (Regional L&D) — ดูแล TH/KH/LS
 
-== Trainer-Division Mapping (สำหรับ Dashboard Analytics) ==
-Sales: Judy, Pui, Jets, Trin, Nueng, Tonpalm
-Optical: Jib, Jajah, Kio, Toy, Kwang, Mark
-Optometry: Dr.Fair, Dr.Benz, Dr.Milk, Dr.Lookaew
-Regional/Other: Peanut, Jame
+โครงสร้าง 8 Areas (2026) — Operation SV/AM + L&D Trainer ประจำ Area:
+Area 1 (SV Mink)   L&D: Trin, Toy, Milk        10 สาขา
+Area 2 (SV Meelap) L&D: Kwang, Tonpalm, Benz   10 สาขา
+Area 3 (SV Bow)    L&D: Kio, Nueng, Looklew     9 สาขา
+Area 4 (SV Ko)     L&D: Pui, Mark              10 สาขา
+Area 5 (SV Juji)   L&D: Jajah, Jets            10 สาขา
+Area 6 (AM Chock)  L&D: Jib                     7 สาขา
+Area 7 (SV Champ)  L&D: Fair                   10 สาขา
+Area 8 (AM Aom)    L&D: Judy                    8 สาขา
+รวม 74 สาขา
 
-== โครงสร้างพื้นที่ (ใหม่ เม.ย. 2026) ==
-5 พื้นที่: Megastore / Metropolitan / North+Central / West+NE / South+Eastern
+== Division (Hybrid — แยกที่ Academy, ทำงาน Hybrid ตอนลง Area) ==
+Sales:     Pui(Asst.TM), Jets, Trin, Nueng, Tonpalm, Judy(TM)
+Optical:   Jib(TM), Jajah(Asst.TM), Kio, Toy, Kwang, Mark
+Optometry: Fair(Specialist), Benz(Specialist), Milk(Specialist), Looklew(Specialist)
+
+== ตำแหน่ง L&D Staff ==
+Judy  = L&D Training Manager Sales&Service (Area 8, AM Aom)
+Jib   = L&D Training Manager Optical&Service (Area 6, AM Chock)
+Fair  = L&D Specialist Optometry&Service (Area 7, SV Champ)
+Pui   = L&D Asst.Training Manager Sales (Area 4, SV Ko)
+Jajah = L&D Asst.Training Manager Optical (Area 5, SV Juji)
+Trin, Kio, Nueng, Jets, Tonpalm, Kwang, Mark, Toy = L&D Trainer
+Milk, Benz, Looklew = L&D Specialist (Optometry)
+
+== โครงสร้างพื้นที่ — 8 Areas ==
+Area 1 (SV Mink): Central Chiangmai, Central Rama 3, Central Hatyai, Central Ayutthaya, Central Chiangrai, V-Square Plaza Nakhon Sawan, Maya Chiangmai, Central Chiangmai Airport, Central Phitsanulok, CPN Lampang
+Area 2 (SV Meelap): Seacon Bangkae, Central Salaya, Central Samui, The Mall Bangkae, Central Westville, Central Nakhon Pathom, Robinson Ratchaburi, Robinson Lifestyle Kanchanaburi, Central Krabi, Robinson Lifestyle Suphanburi
+Area 3 (SV Bow): Terminal 21 Pattaya, Central Rayong, Central Si Racha, Central Chanthaburi, Terminal 21 Rama 3, Central Nakhon Si, Charn At The Avenue, Robinson Lifestyle Chachoengsao, New store-Prachinburi
+Area 4 (SV Ko): Gaysorn Village, Donki Mall Thonglor, Central Village, Siam Premium Outlets, Central Pinklao, Central Ramindra, Park Silom, True Digital Park, Robinson Latkrabang, New store-CPN Surattahni
+Area 5 (SV Juji): Central Eastville, Central Mahachai, Icon Siam, Gateway Bangsue, Central Rama 2, Marche Thonglor, Makro Sri Ayutthaya, One Bangkok, Esplanade Ratchada, Habbitat
+Area 6 (AM Chock): Mega Bangna, Fashion Island, Central Westgate, Central Rama 9, Lotus's Mall Makro Sathon, The Mall Bang Kapi, New store-Northville
+Area 7 (SV Champ): The Mall Korat, Central Udon, Central Phuket, Central Khonkaen, Market Village Huahin, Robinson Lifestyle Saraburi, Outlet Square Muang Thong Thani, Robinson Lifestyle Trang, Robinson Lifestyle Buriram, CPN Khonkaen Campus
+Area 8 (AM Aom): Zpell @ Future Park, Seacon Square, CentralWorld, Siam Center, Imperial World Samrong, The Glass Market Bangna, New store-Petchaburi, New store-Chaengwattana
 
 == หลักสูตรทั้งหมด 16 หลักสูตร ==
 Hybrid: OTT (Orientation), PE (Personality Enhancement), BOBT (Basic On-Board), MOBT (Moderate On-Board), MTOBT (Mastery On-Board), SMOT (Store Manager Orientation), MOT (Management Orientation)

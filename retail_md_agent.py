@@ -41,7 +41,15 @@ REX_PROMPT = """คุณคือ "Rex" — Retail Store Managing Director AI �
 - เสนอ training intervention เมื่อเห็นว่าสาขาใดขาด skill ที่จำเป็น
 - ติดตาม KPI หลัก: revenue, conversion rate, lens upsell rate, frame sold, ATV (Average Transaction Value)
 
-5 พื้นที่: Megastore (MS) / Metropolitan (MT) / North+Central (NC) / West+NE (WN) / South+Eastern (SE)
+8 Areas (โครงสร้างใหม่ 2026):
+Area 1 (SV Mink)   10 สาขา: Central Chiangmai, Central Rama 3, Central Hatyai, Central Ayutthaya, Central Chiangrai, V-Square Plaza Nakhon Sawan, Maya Chiangmai, Central Chiangmai Airport, Central Phitsanulok, CPN Lampang
+Area 2 (SV Meelap) 10 สาขา: Seacon Bangkae, Central Salaya, Central Samui, The Mall Bangkae, Central Westville, Central Nakhon Pathom, Robinson Ratchaburi, Robinson Lifestyle Kanchanaburi, Central Krabi, Robinson Lifestyle Suphanburi
+Area 3 (SV Bow)     9 สาขา: Terminal 21 Pattaya, Central Rayong, Central Si Racha, Central Chanthaburi, Terminal 21 Rama 3, Central Nakhon Si, Charn At The Avenue, Robinson Lifestyle Chachoengsao, New store-Prachinburi
+Area 4 (SV Ko)     10 สาขา: Gaysorn Village, Donki Mall Thonglor, Central Village, Siam Premium Outlets, Central Pinklao, Central Ramindra, Park Silom, True Digital Park, Robinson Latkrabang, New store-CPN Surattahni
+Area 5 (SV Juji)   10 สาขา: Central Eastville, Central Mahachai, Icon Siam, Gateway Bangsue, Central Rama 2, Marche Thonglor, Makro Sri Ayutthaya, One Bangkok, Esplanade Ratchada, Habbitat
+Area 6 (AM Chock)   7 สาขา: Mega Bangna, Fashion Island, Central Westgate, Central Rama 9, Lotus's Mall Makro Sathon, The Mall Bang Kapi, New store-Northville
+Area 7 (SV Champ)  10 สาขา: The Mall Korat, Central Udon, Central Phuket, Central Khonkaen, Market Village Huahin, Robinson Lifestyle Saraburi, Outlet Square Muang Thong Thani, Robinson Lifestyle Trang, Robinson Lifestyle Buriram, CPN Khonkaen Campus
+Area 8 (AM Aom)     8 สาขา: Zpell @ Future Park, Seacon Square, CentralWorld, Siam Center, Imperial World Samrong, The Glass Market Bangna, New store-Petchaburi, New store-Chaengwattana
 
 สาขาทั้งหมด (73+):
 MEGA Bangna, Zpell @ Future Park, Central Eastville, Seacon Bangkae, Seacon Square, Fashion Island,
@@ -164,7 +172,7 @@ REX_TOOLS = [
             "properties": {
                 "area": {
                     "type": "string",
-                    "enum": ["Megastore", "Metropolitan", "North+Central", "West+NE", "South+Eastern", "all"],
+                    "enum": ["Area1", "Area2", "Area3", "Area4", "Area5", "Area6", "Area7", "Area8", "all"],
                     "description": "พื้นที่ที่ต้องการดู (all = ทุกพื้นที่)"
                 }
             },

@@ -45,8 +45,8 @@ PEOPLE_PROMPT = """คุณคือ "People" — HR Manager AI ของ OWNDA
 - Sheet "Assessment": ผลการประเมิน
 - Sheet "OAR log": บันทึกการลงทะเบียน On-the-job
 
-5 พื้นที่: Megastore, Metropolitan, North+Central, West+NE, South+Eastern
-Trainer teams: Judy/Pui/Jets/Trin/Nueng/Tonpalm (Sales), Jib/Jajah/Kio/Toy/Kwang/Mark (Optical), Dr.Fair/Dr.Benz/Dr.Milk/Dr.Lookaew (Optometry)
+8 Areas (2026): Area1(SV Mink), Area2(SV Meelap), Area3(SV Bow), Area4(SV Ko), Area5(SV Juji), Area6(AM Chock), Area7(SV Champ), Area8(AM Aom) — รวม 74 สาขา
+L&D per Area: A1=Trin,Toy,Milk | A2=Kwang,Tonpalm,Benz | A3=Kio,Nueng,Looklew | A4=Pui,Mark | A5=Jajah,Jets | A6=Jib | A7=Fair | A8=Judy
 
 กฎการตอบ:
 - ตอบภาษาไทย plain text ไม่ใช้ Markdown

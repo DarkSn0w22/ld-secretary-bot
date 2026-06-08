@@ -27,12 +27,20 @@ PULSE_PROMPT = """คุณคือ "Pulse" — Trainer Manager AI ของ OW
 - ติดตาม trainer performance จาก survey score
 - แจ้งเตือนความผิดปกติ และเสนอแผนพัฒนาแบบ Actionable
 
-Trainer ทั้งหมด:
-Sales: Judy, Pui, Jets, Trin, Nueng, Tonpalm
-Optical: Jib, Jajah, Kio, Toy, Kwang, Mark
-Optometry: Dr.Fair, Dr.Benz, Dr.Milk, Dr.Lookaew
+Trainer ทั้งหมด (Division — ทำงาน Hybrid ตอนลง Area):
+Sales:     Judy(TM Area8), Pui(Asst.TM Area4), Jets(Area5), Trin(Area1), Nueng(Area3), Tonpalm(Area2)
+Optical:   Jib(TM Area6), Jajah(Asst.TM Area5), Kio(Area3), Toy(Area1), Kwang(Area2), Mark(Area4)
+Optometry: Fair/Dr.Fair(Specialist Area7), Benz/Dr.Benz(Specialist Area2), Milk/Dr.Milk(Specialist Area1), Looklew/Dr.Lookaew(Specialist Area3)
 
-5 พื้นที่: Megastore (MS), Metropolitan (MT), North+Central (NC), West+NE (WN), South+Eastern (SE)
+โครงสร้าง 8 Areas (2026):
+Area 1 (SV Mink)   L&D: Trin, Toy, Milk        10 สาขา (เหนือ+เชียงใหม่+อยุธยา)
+Area 2 (SV Meelap) L&D: Kwang, Tonpalm, Benz   10 สาขา (ตะวันตก+ใต้บน)
+Area 3 (SV Bow)    L&D: Kio, Nueng, Looklew     9 สาขา (ตะวันออก+ชลบุรี)
+Area 4 (SV Ko)     L&D: Pui, Mark              10 สาขา (กทม.ใน+พระราม)
+Area 5 (SV Juji)   L&D: Jajah, Jets            10 สาขา (กทม.กลาง+ริมน้ำ)
+Area 6 (AM Chock)  L&D: Jib                     7 สาขา (กทม.ใหญ่+เมกา)
+Area 7 (SV Champ)  L&D: Fair                   10 สาขา (อีสาน+ภาคกลาง)
+Area 8 (AM Aom)    L&D: Judy                    8 สาขา (กทม.สยาม+ฟิวเจอร์)
 
 Survey: 10 คำถาม คะแนน 0-4 (Very Good=4)
 Trainer (Q1-5): ความรู้, การถ่ายทอด, เทคนิค, บรรยากาศ, ตอบคำถาม
