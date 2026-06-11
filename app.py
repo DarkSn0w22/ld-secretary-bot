@@ -252,51 +252,10 @@ TOOLS = [
             "required": ["task"]
         }
     },
-    {
-        "name": "write_to_sheets",
-        "description": "บันทึกรายงาน/ผลงาน/ข้อมูลลง Google Sheets (OWNDAYS AI Reports) — ใช้เมื่อต้องการเก็บผลการวิเคราะห์ รายงาน หรือข้อมูลสำคัญ",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "tab_name": {
-                    "type": "string",
-                    "description": "ชื่อ tab/แผนก เช่น rocket, rex, pulse, coin, atlas, lens (จะเป็นชื่อ sheet tab)"
-                },
-                "title": {
-                    "type": "string",
-                    "description": "หัวเรื่องรายงาน เช่น 'Sales Analysis สัปดาห์ 22', 'Training Plan Q3'"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "เนื้อหาทั้งหมดที่ต้องการบันทึก"
-                }
-            },
-            "required": ["tab_name", "title", "content"]
-        }
-    },
-    {
-        "name": "create_drive_file",
-        "description": "สร้างไฟล์ text/report ใน Google Drive folder ของ OWNDAYS L&D AI — ใช้เมื่อต้องการสร้างเอกสาร action plan, proposal, หรือ report ที่ต้องแชร์",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "filename": {
-                    "type": "string",
-                    "description": "ชื่อไฟล์ เช่น 'Action_Plan_Branch_WN_Jun2026.txt'"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "เนื้อหาของไฟล์"
-                },
-                "subfolder": {
-                    "type": "string",
-                    "description": "ชื่อโฟลเดอร์ย่อย (optional) เช่น 'Reports', 'Action Plans', 'Training'"
-                }
-            },
-            "required": ["filename", "content"]
-        }
-    }
 ]
+# ── Inject shared save/read tools (write_to_sheets, read_any_sheet, create_drive_file) ──
+from agent_save_tools import SAVE_TOOLS
+TOOLS = TOOLS + SAVE_TOOLS
 
 
 def _auto_save_to_sheets(agent_id: str, task: str, result: str):
@@ -319,6 +278,12 @@ def _auto_save_to_sheets(agent_id: str, task: str, result: str):
 
 def execute_tool(tool_name, tool_input):
     """Route tool call → agent bus (หรือ direct call สำหรับ data tools)"""
+    # ── Shared save/read tools (write_to_sheets, read_any_sheet, create_drive_file) ──
+    from agent_save_tools import execute_save_tool
+    shared = execute_save_tool(tool_name, tool_input, agent_id="rocket")
+    if shared is not None:
+        return shared
+
     # ── Data tools ──────────────────────────────────────────────────
     if tool_name == "get_survey_data":
         return get_survey_summary()
@@ -330,47 +295,6 @@ def execute_tool(tool_name, tool_input):
         return f"Sheets ใน {sheet_key}: {', '.join(names)}" if names else "ไม่พบข้อมูล"
     elif tool_name == "web_search":
         return google_search(tool_input.get("query", ""))
-
-    # ── write_to_sheets ──────────────────────────────────────────────
-    elif tool_name == "write_to_sheets":
-        try:
-            from drive_api import save_report
-            tab   = tool_input.get("tab_name", "rocket")
-            title = tool_input.get("title", "รายงาน")
-            body  = tool_input.get("content", "")
-            res   = save_report(tab, title, body)
-            if res.get("ok"):
-                url = res.get("url", "")
-                log_agent("rocket", "sheets", f"saved: {title[:80]}", url)
-                return (f"✅ บันทึกลง Google Sheets สำเร็จครับ\n"
-                        f"Tab: {res.get('tab','?')}\n"
-                        f"Link: {url}")
-            else:
-                return f"❌ บันทึกไม่สำเร็จ: {res.get('error','unknown')}"
-        except Exception as e:
-            return f"❌ write_to_sheets error: {e}"
-
-    # ── create_drive_file ────────────────────────────────────────────
-    elif tool_name == "create_drive_file":
-        try:
-            filename  = tool_input.get("filename", "report.txt")
-            content   = tool_input.get("content", "")
-            subfolder = tool_input.get("subfolder", "")
-
-            # ใช้ Sheets บันทึกเป็น tab แทน Drive file (service account quota issue)
-            from drive_api import save_report
-            tab_name = subfolder or "drive_files"
-            res = save_report(tab_name, filename, content)
-            if res.get("ok"):
-                url = res.get("url", "")
-                log_agent("rocket", "drive", f"file: {filename}", url)
-                return (f"✅ สร้างไฟล์ '{filename}' สำเร็จครับ\n"
-                        f"บันทึกใน Google Sheets tab '{res.get('tab','?')}'\n"
-                        f"Link: {url}")
-            else:
-                return f"❌ สร้างไฟล์ไม่สำเร็จ: {res.get('error','unknown')}"
-        except Exception as e:
-            return f"❌ create_drive_file error: {e}"
 
     # ── AI Agent tools ───────────────────────────────────────────────
     AGENT_TOOL_MAP = {
@@ -465,8 +389,9 @@ ask_web_admin → Pixel (เว็บไซต์ od-connect.com)
 ask_data_analyst → Sigma (วิเคราะห์ข้อมูล trends KPI)
 ask_creator → Lens (สร้าง content quiz script)
 ask_retail_md → Rex (sales สาขา branch performance)
-write_to_sheets → บันทึกลง Google Sheets (tab ตามชื่อแผนก)
-create_drive_file → สร้างไฟล์ใน Google Drive (action plan, report)
+write_to_sheets → บันทึกลง Google Sheets — default ไป OWNDAYS AI Reports tab ของแผนก หรือระบุ sheet_id+tab_name เพื่อเขียนลง sheet ใดก็ได้
+read_any_sheet → อ่านข้อมูลจาก Sheets ใดก็ได้ (generic reader) ใช้ดูตารางงาน trainers, schedules, planning sheets
+create_drive_file → สร้างไฟล์จริงใน Google Drive folder (ถ้า API พร้อม) หรือ fallback เป็น Sheets row
 
 เมื่อ Peanut บอก "ให้ [agent] ทำ..." หรือ "กระจายงาน" หรือ "ให้แต่ละแผนก..." ให้:
 - เรียก tool ที่เกี่ยวข้องทันที (เรียกหลาย tool ต่อเนื่องได้)
@@ -1236,6 +1161,32 @@ def api_test_all_saves():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/test-drive", methods=["POST"])
+def api_test_drive():
+    """ทดสอบสร้างไฟล์จริงใน Google Drive folder"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from agent_save_tools import _try_create_real_drive_file, DEFAULT_FOLDER_ID
+        now_str = datetime.now().strftime("%Y%m%d_%H%M")
+        filename = f"Test_File_{now_str}.txt"
+        result = _try_create_real_drive_file(
+            filename=filename,
+            content=f"✅ Test write to Drive at {now_str}\nFolder: {DEFAULT_FOLDER_ID}",
+            folder_id=DEFAULT_FOLDER_ID,
+            agent_id="dashboard"
+        )
+        if result is None:
+            return jsonify({
+                "ok": False,
+                "error": "Drive API not available — googleapiclient or auth missing",
+                "folder_id": DEFAULT_FOLDER_ID
+            })
+        return jsonify({"ok": True, "result": result, "folder_id": DEFAULT_FOLDER_ID})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/test-sheets", methods=["POST"])
