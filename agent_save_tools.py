@@ -362,21 +362,79 @@ def _fallback_save_as_sheets_row(filename: str, content: str, agent_id: str) -> 
 
 # ── Auto-save helper (เรียกหลัง agent เสร็จงาน) ─────────────────────────────
 
+# ขนาดผลงานที่ถือว่า "ชิ้นใหญ่" → สร้างเป็น Drive file ด้วย
+# ปรับได้ผ่าน env AUTO_DRIVE_THRESHOLD (default 500 chars)
+AUTO_DRIVE_THRESHOLD = int(os.getenv("AUTO_DRIVE_THRESHOLD", "500"))
+AUTO_DRIVE_ENABLED   = os.getenv("AUTO_DRIVE_ENABLED", "1") == "1"
+
+
+def _slugify(text: str, max_len: int = 40) -> str:
+    """แปลงข้อความเป็น filename-safe slug"""
+    import re
+    # เอาเฉพาะ alphanumeric + spaces, ตัดสั้น
+    cleaned = re.sub(r'[^\w\s\-ก-๙]', '', text)[:max_len]
+    return cleaned.strip().replace(' ', '_') or 'report'
+
+
 def auto_save(agent_id: str, task: str, result: str) -> None:
-    """บันทึก agent result ลง Sheets แบบ background"""
+    """
+    บันทึก agent result อัตโนมัติ:
+      1. ทุกครั้ง → Sheets tab ของ agent นั้น (background)
+      2. ถ้าผลงาน > AUTO_DRIVE_THRESHOLD → Drive file ด้วย (background)
+    """
     if not result or len(result) < 40:
         return
 
-    def _save():
+    def _save_sheets():
         try:
             from drive_api import save_report
             tab = agent_id.capitalize()
             res = save_report(tab, task[:150], result)
             if res.get("ok"):
-                print(f"[AutoSave] {tab} ✅")
+                print(f"[AutoSave] {tab} Sheets ✅")
             else:
-                print(f"[AutoSave] {tab} ❌ {res.get('error','')}")
+                print(f"[AutoSave] {tab} Sheets ❌ {res.get('error','')}")
         except Exception as e:
-            print(f"[AutoSave] {agent_id} error: {e}")
+            print(f"[AutoSave] {agent_id} Sheets error: {e}")
 
-    threading.Thread(target=_save, daemon=True, name=f"save-{agent_id}").start()
+    def _save_drive():
+        """สร้าง Drive file สำหรับงานชิ้นใหญ่"""
+        try:
+            from datetime import datetime
+            import pytz
+            BANGKOK = pytz.timezone("Asia/Bangkok")
+            now     = datetime.now(BANGKOK)
+            ts      = now.strftime("%Y%m%d_%H%M")
+            slug    = _slugify(task, 35)
+            filename = f"{agent_id.capitalize()}_{ts}_{slug}.txt"
+
+            # Header + content
+            content = (
+                f"=== {agent_id.upper()} Report ===\n"
+                f"วันที่: {now.strftime('%Y-%m-%d %H:%M น.')}\n"
+                f"งาน: {task}\n"
+                f"{'='*50}\n\n"
+                f"{result}"
+            )
+
+            res = _try_create_real_drive_file(
+                filename=filename,
+                content=content,
+                folder_id=DEFAULT_FOLDER_ID,
+                agent_id=agent_id
+            )
+            if res:
+                print(f"[AutoDrive] {agent_id.capitalize()} Drive ✅ ({filename})")
+            else:
+                print(f"[AutoDrive] {agent_id.capitalize()} Drive ⚠️ (fallback to Sheets only)")
+        except Exception as e:
+            print(f"[AutoDrive] {agent_id} error: {e}")
+
+    # ── เริ่ม Sheets save เสมอ ──────────────────────────────────
+    threading.Thread(target=_save_sheets, daemon=True,
+                     name=f"save-sheets-{agent_id}").start()
+
+    # ── เริ่ม Drive save เฉพาะงานชิ้นใหญ่ ──────────────────────
+    if AUTO_DRIVE_ENABLED and len(result) >= AUTO_DRIVE_THRESHOLD:
+        threading.Thread(target=_save_drive, daemon=True,
+                         name=f"save-drive-{agent_id}").start()
