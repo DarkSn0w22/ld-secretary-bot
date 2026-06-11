@@ -490,6 +490,16 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
     <div class="hs"><div class="hsv" style="color:var(--yellow)" id="h-msgs">0</div><div class="hsl">Msgs</div></div>
     <!-- Google Drive / Reports shortcuts -->
     <div style="display:flex;gap:6px;align-items:center;margin:0 8px;">
+      <button onclick="testDrive()" title="ทดสอบสร้างไฟล์จริงใน Google Drive"
+        id="test-drive-btn"
+        style="display:flex;align-items:center;gap:4px;padding:5px 8px;
+               background:#1a0a0a;border:1px solid #3a1a1a;border-radius:5px;
+               color:#60302a;font-size:9px;font-family:'Rajdhani',sans-serif;
+               font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;"
+        onmouseover="this.style.borderColor='#fb923c';this.style.color='#fb923c'"
+        onmouseout="this.style.borderColor='#3a1a1a';this.style.color='#60302a'">
+        📂 Drive
+      </button>
       <button onclick="testAllSaves()" title="ทดสอบว่าทุก agent บันทึก Sheets ได้"
         id="test-all-btn"
         style="display:flex;align-items:center;gap:4px;padding:5px 8px;
@@ -3051,6 +3061,27 @@ async function seedMemory() {
 // โหลด trends ตอน init + refresh ทุก 10 นาที
 setTimeout(loadKpiTrends, 2000);
 setInterval(loadKpiTrends, 10 * 60 * 1000);
+
+// ── Test Drive File Creation ─────────────────────────────────────────────────
+async function testDrive() {
+  const btn = document.getElementById('test-drive-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Testing...'; }
+  try {
+    const r = await fetch('/api/test-drive', {method:'POST', headers:AUTH_HEADERS});
+    const d = await r.json();
+    if (d.ok) {
+      alert(`✅ สร้างไฟล์ใน Drive สำเร็จ!\n\n${d.result}\n\nFolder ID: ${d.folder_id}`);
+      if (btn) { btn.innerHTML = '✅'; btn.style.color='#fb923c'; setTimeout(()=>{btn.innerHTML=orig;btn.style.color='';btn.disabled=false;},3000); }
+    } else {
+      alert(`❌ ไม่สามารถสร้างไฟล์ใน Drive\n\nError: ${d.error||'unknown'}\n\nFolder ID: ${d.folder_id||'(none)'}\n\nตรวจ:\n• Service Account มีสิทธิ์ Editor ใน folder?\n• googleapiclient ติดตั้งแล้ว?`);
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  } catch(e) {
+    alert('Network error: ' + e);
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
 
 // ── Test All Agent Saves ─────────────────────────────────────────────────────
 const AGENT_EMOJI = {rocket:'🚀',atlas:'🎯',pulse:'📚',sage:'📋',guard:'🛡️',
