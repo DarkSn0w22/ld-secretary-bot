@@ -14,7 +14,7 @@ from flask import Flask, request, abort, jsonify, send_file, Response
 import anthropic
 from models_config import get_model
 import requests
-from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, SHEET_IDS
+from sheets_tools import get_survey_summary, get_oar_summary, get_sheet_names, get_trainer_schedule, SHEET_IDS
 from memory import init_db, load_history, save_message, clear_history, get_message_count
 from scheduler import start_scheduler
 from manager_agent import run_manager, run_scheduled_task
@@ -100,10 +100,24 @@ TOOLS = [
             "properties": {
                 "sheet_key": {
                     "type": "string",
-                    "enum": ["survey", "dashboard", "oar"]
+                    "enum": ["survey", "dashboard", "oar", "trainers", "reports"]
                 }
             },
             "required": ["sheet_key"]
+        }
+    },
+    {
+        "name": "get_trainer_schedule",
+        "description": "ดึงข้อมูลตารางงาน Trainers + AI tasks จาก Google Sheets (Sheet: ตารางงาน AI + Trainers) — ใช้เมื่อต้องการดูตารางงาน schedule, plan, หรือ assignment ของ trainer",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tab_name": {
+                    "type": "string",
+                    "description": "ชื่อ tab ที่ต้องการดู (ไม่ระบุ = tab แรก) เช่น 'June2026', 'Schedule', 'Trainer Plan'"
+                }
+            },
+            "required": []
         }
     },
     {
@@ -293,6 +307,8 @@ def execute_tool(tool_name, tool_input):
         sheet_key = tool_input.get("sheet_key", "survey")
         names = get_sheet_names(SHEET_IDS.get(sheet_key, SHEET_IDS["survey"]))
         return f"Sheets ใน {sheet_key}: {', '.join(names)}" if names else "ไม่พบข้อมูล"
+    elif tool_name == "get_trainer_schedule":
+        return get_trainer_schedule(tab_name=tool_input.get("tab_name", ""))
     elif tool_name == "web_search":
         return google_search(tool_input.get("query", ""))
 
@@ -505,6 +521,13 @@ Program (6-10): สื่อการสอน, กิจกรรม, สถา
 - Dashboard: HTML + Chart.js v4.4.1 + Google Apps Script API v6
 - ข้อมูลเก็บใน Google Drive และ Google Sheets
 - New Raw Data Folder: https://drive.google.com/drive/folders/1M_omBsJNJb-kJKp1nRAo88TD6fYCeTnL
+
+== Google Sheets ที่เชื่อมต่อ (5 sheets) ==
+- survey:    Training Survey
+- dashboard: L&D Dashboard
+- oar:       Training OAR
+- trainers:  ตารางงาน AI + Trainers (1vXfDYIE...) — ใช้ get_trainer_schedule
+- reports:   OWNDAYS AI Reports (1wXZI3aX...) — auto-save ทุก agent
 
 == L&D Dashboard (GAS API v6) ==
 Dashboard Tabs ทั้งหมด 11 tabs:
@@ -1161,6 +1184,32 @@ def api_test_all_saves():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/test-trainers-sheet", methods=["POST"])
+def api_test_trainers_sheet():
+    """ทดสอบเชื่อมต่อ Trainers schedule sheet"""
+    if not _check_dashboard_auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        from sheets_tools import get_sheet_names, SHEET_IDS
+        sid = SHEET_IDS["trainers"]
+        tabs = get_sheet_names(sid)
+        if not tabs:
+            return jsonify({
+                "ok": False,
+                "error": "ไม่สามารถเข้าถึง Trainers sheet — ตรวจ Service Account permissions",
+                "sheet_id": sid
+            })
+        sample = get_trainer_schedule(tab_name=tabs[0])
+        return jsonify({
+            "ok": True,
+            "sheet_id": sid,
+            "tabs": tabs,
+            "sample_first_tab": sample[:800]
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/test-drive", methods=["POST"])

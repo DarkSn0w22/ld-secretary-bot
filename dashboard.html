@@ -490,6 +490,16 @@ body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monosp
     <div class="hs"><div class="hsv" style="color:var(--yellow)" id="h-msgs">0</div><div class="hsl">Msgs</div></div>
     <!-- Google Drive / Reports shortcuts -->
     <div style="display:flex;gap:6px;align-items:center;margin:0 8px;">
+      <button onclick="testTrainersSheet()" title="ทดสอบเชื่อมต่อตารางงาน Trainers"
+        id="test-trainers-btn"
+        style="display:flex;align-items:center;gap:4px;padding:5px 8px;
+               background:#0a1414;border:1px solid #1a3030;border-radius:5px;
+               color:#2a5050;font-size:9px;font-family:'Rajdhani',sans-serif;
+               font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;"
+        onmouseover="this.style.borderColor='#22d3ee';this.style.color='#22d3ee'"
+        onmouseout="this.style.borderColor='#1a3030';this.style.color='#2a5050'">
+        📅 Trainers
+      </button>
       <button onclick="testDrive()" title="ทดสอบสร้างไฟล์จริงใน Google Drive"
         id="test-drive-btn"
         style="display:flex;align-items:center;gap:4px;padding:5px 8px;
@@ -3061,6 +3071,27 @@ async function seedMemory() {
 // โหลด trends ตอน init + refresh ทุก 10 นาที
 setTimeout(loadKpiTrends, 2000);
 setInterval(loadKpiTrends, 10 * 60 * 1000);
+
+// ── Test Trainers Sheet Connection ───────────────────────────────────────────
+async function testTrainersSheet() {
+  const btn = document.getElementById('test-trainers-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳...'; }
+  try {
+    const r = await fetch('/api/test-trainers-sheet', {method:'POST', headers:AUTH_HEADERS});
+    const d = await r.json();
+    if (d.ok) {
+      alert(`✅ Trainers Sheet เชื่อมต่อสำเร็จ!\n\nSheet ID: ${d.sheet_id}\n\nTabs ที่มี (${d.tabs.length}):\n${d.tabs.join(', ')}\n\n--- ตัวอย่างข้อมูล tab แรก ---\n${d.sample_first_tab || '(ว่าง)'}`);
+      if (btn) { btn.innerHTML = '✅'; btn.style.color='#22d3ee'; setTimeout(()=>{btn.innerHTML=orig;btn.style.color='';btn.disabled=false;},3000); }
+    } else {
+      alert(`❌ เชื่อมต่อ Trainers Sheet ไม่ได้\n\nError: ${d.error||'unknown'}\n\nSheet ID: ${d.sheet_id||''}\n\nตรวจ Service Account email มีสิทธิ์ Viewer/Editor ใน sheet นี้หรือยัง`);
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  } catch(e) {
+    alert('Network error: ' + e);
+    if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
 
 // ── Test Drive File Creation ─────────────────────────────────────────────────
 async function testDrive() {

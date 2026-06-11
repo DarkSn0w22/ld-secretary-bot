@@ -16,11 +16,13 @@ SHEET_IDS = {
     "survey":    "1RlnQEXOJ3EPwqnuDLMk3rjBvinJbW1wKFcRyMfdlEVs",
     "dashboard": "1QKjyFlmJrgmiYHagn7olhpr41ucQJQc8ck3zae8obJI",
     "oar":       "1Ux83yvg3sdANd8_OB104Np9jartOfEF9_xhoX5JslSU",
+    "trainers":  "1vXfDYIE-Otd5frS0RxsGP6D-IVfDlTQcO6YC0P0ZowY",  # ตารางงาน AI + Trainers
+    "reports":   "1wXZI3aXj21ZkhcJgUA4lD5BewjzridVtbHaNeNgnxJQ",  # OWNDAYS AI Reports
 }
 
 SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets.readonly",
-    "https://www.googleapis.com/auth/drive.readonly"
+    "https://www.googleapis.com/auth/spreadsheets",   # read+write (เพิ่ม write)
+    "https://www.googleapis.com/auth/drive"           # read+write
 ]
 
 
@@ -130,6 +132,45 @@ def get_oar_summary() -> str:
 
     for row in data[:20]:
         result += " | ".join(str(cell) for cell in row) + "\n"
+
+    return result
+
+
+def get_trainer_schedule(tab_name: str = "", max_rows: int = 60) -> str:
+    """
+    ดึงข้อมูลตารางงาน Trainers + AI tasks
+    Sheet: 1vXfDYIE-Otd5frS0RxsGP6D-IVfDlTQcO6YC0P0ZowY
+
+    Args:
+        tab_name  ชื่อ tab (ถ้าไม่ระบุใช้ tab แรกที่มีหรือ tab ปัจจุบัน)
+        max_rows  จำนวนแถวสูงสุด (default 60)
+    """
+    sheet_id   = SHEET_IDS["trainers"]
+    sheet_names = get_sheet_names(sheet_id)
+    if not sheet_names:
+        return "ไม่สามารถเชื่อมต่อ Trainers schedule sheet ได้ (ตรวจ Service Account permissions)"
+
+    # ใช้ tab ที่ระบุ หรือ default tab แรก
+    if tab_name and tab_name in sheet_names:
+        target_tab = tab_name
+    elif tab_name:
+        return (f"ไม่พบ tab '{tab_name}' ใน Trainers sheet\n"
+                f"Tabs ที่มี: {', '.join(sheet_names)}")
+    else:
+        target_tab = sheet_names[0]
+
+    data = read_sheet(sheet_id, f"{target_tab}!A1:Z{max_rows}", limit_rows=max_rows)
+    if not data:
+        return f"ไม่พบข้อมูลใน tab '{target_tab}'"
+
+    result = f"📅 ตารางงาน Trainers (Tab: {target_tab})\n"
+    result += f"Tabs ทั้งหมด: {', '.join(sheet_names)}\n"
+    result += f"แสดง {len(data)} แถว:\n\n"
+
+    for row in data:
+        cells = " | ".join(str(c)[:50] for c in row if c)
+        if cells.strip():
+            result += cells + "\n"
 
     return result
 
