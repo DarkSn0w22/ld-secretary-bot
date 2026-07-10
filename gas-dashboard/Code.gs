@@ -955,7 +955,9 @@ function getEmployeeManagementData() {
       var trainData = trainSh.getDataRange().getValues();
       if (trainData.length >= 2) {
         var trainHdr = trainData[0];
-        var COURSES = ["1st BCL","2nd BCL","3rd BCL","1st GBT","2nd GBT","1st SMT","2nd SMT","MCL [OP]","MCL [OD]","MTCL [OP]","MTCL [OD]"];
+        // Training tab ใช้รหัสคอร์สแบบเดียวกับ Survey/OAR (OTT/PE/BSC/... ) คนละชุดกับ
+        // Assessment tab (1st BCL/GBT/SMT/MCL/MTCL — สำหรับสายเลนส์/คอนแทคเลนส์โดยเฉพาะ)
+        var COURSES = ["OTT","PE","BSC","BOC","BVC","MSC","MOC","MVC","MTSC","MTOC","MTVC"];
         var courseCols = {};
         var anyFound = false;
         for (var ci = 0; ci < COURSES.length; ci++) {
@@ -1004,11 +1006,24 @@ function getEmployeeManagementData() {
   // === OAR — ลงทะเบียนในคลาส vs OBT ต่อเดือน ===
   try {
     var oarSs = SpreadsheetApp.openById(OAR_ID);
+    // ชื่อ tab OBT อาจสะกด/เว้นวรรคต่างจากที่คาด — ถ้าหาตรงชื่อไม่เจอ scan หา tab ที่มีคำว่า "obt" แทน
+    function _findObtSheet(ss) {
+      var sheets = ss.getSheets();
+      for (var i = 0; i < sheets.length; i++) {
+        if (sheets[i].getName().toLowerCase().indexOf("obt") >= 0) return sheets[i];
+      }
+      return null;
+    }
     var tabs = [{name: "Registrations", key: "in_class"}, {name: "Registration (OBT)", key: "obt"}];
     for (var ti = 0; ti < tabs.length; ti++) {
       var tabInfo = tabs[ti];
       var tSheet = oarSs.getSheetByName(tabInfo.name);
-      if (!tSheet) { out.oar_monthly[tabInfo.key] = {error: "Sheet '" + tabInfo.name + "' not found"}; continue; }
+      if (!tSheet && tabInfo.key === "obt") tSheet = _findObtSheet(oarSs);
+      if (!tSheet) {
+        var oarSheetNames = oarSs.getSheets().map(function(s){ return s.getName(); });
+        out.oar_monthly[tabInfo.key] = {error: "Sheet '" + tabInfo.name + "' not found. Available sheets: " + oarSheetNames.join(", ")};
+        continue;
+      }
       var tData = tSheet.getDataRange().getValues();
       if (tData.length < 2) { out.oar_monthly[tabInfo.key] = {}; continue; }
       var tHdr = tData[0];
