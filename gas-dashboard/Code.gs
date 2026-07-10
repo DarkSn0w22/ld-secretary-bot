@@ -1,19 +1,27 @@
 // ============================================================
-// L&D Dashboard — GAS API v9 (v8 + Cost tab-name fix)
+// L&D Dashboard — GAS API v10 (v9 + Area source switch, Employee
+// Management, Trainer tiers, Academy aggregator)
 // ทั้งไฟล์นี้เป็นสำเนาไว้เทียบ/track การเปลี่ยนแปลง — ต้อง copy วางทับ
 // ใน Google Apps Script editor แล้ว Deploy ใหม่เองด้วยนะครับ (ยังไม่มี clasp เชื่อมตรง)
 //
-// v9 changes:
-//   - getCostData(): ชื่อ tab จริงคือ "L&D Financial" ไม่ใช่ "Cost" (สาเหตุที่
-//     action=cost error "Cost sheet not found" อยู่ก่อนหน้านี้) — แก้ _findSheet
-//     ให้หา "L&D Financial" เป็นหลัก, เหลือ "Cost" ไว้เป็น fallback เผื่อเปลี่ยนชื่อกลับ,
-//     และถ้าหาไม่เจอเลยจะ list ชื่อ sheet ทั้งหมดกลับไปด้วยเพื่อ debug ง่ายขึ้นในอนาคต
+// v10 changes:
+//   - AREA_ID เปลี่ยนไปสเปรดชีตใหม่ (โครงสร้าง Area1-Area8 แทน MS/MT/NC/WN/SE เดิม)
+//     getAreaData() เขียนใหม่ทั้งหมดให้ตรงกับ tab A{n}-Employee/-Store/-Learning
+//     ชื่อ/หัวหน้างานต่อ Area อ้างตาม org_structure.py (single source of truth ของบอท)
+//     หมายเหตุ: สเปรดชีตใหม่เพิ่งสร้าง ข้อมูล metric ยังเป็น 0 ทั้งหมด (template รอบ
+//     รายงาน Jun-Nov 2026) เป็นเรื่องคาดหมายไว้แล้ว ไม่ใช่บั๊ก
+//   - เพิ่ม action=employee — getEmployeeManagementData() ดึงจากไฟล์ Employee Master
+//     เดียวกับ Assessment (ASSESS_ID) แต่คนละ tab: Employee, HQ, Resigned employee,
+//     Training, Assessment + OAR ทั้ง 2 tab (Registrations + Registration (OBT))
+//   - getSurveyData(): ตัดคำต่อท้าย "(Department)" ออกจากชื่อ trainer, แนบ tier
+//     (head/asst/trainer) ตามรายชื่อ L&D จริงที่ปรากฏใน Main Trainer column
+//   - เพิ่ม action=academy — getAcademyData() สรุปเลขหลักๆจากทุก action รวมไว้ที่เดียว
 // ============================================================
 var SURVEY_ID    = "1RlnQEXOJ3EPwqnuDLMk3rjBvinJbW1wKFcRyMfdlEVs";
 var DASHBOARD_ID = "1QKjyFlmJrgmiYHagn7olhpr41ucQJQc8ck3zae8obJI";
 var OAR_ID       = "1Ux83yvg3sdANd8_OB104Np9jartOfEF9_xhoX5JslSU";
-var AREA_ID      = "1IQkFbrj8jOni9XgIn3CIWvGZgeJ2FMGTveBjy3sodWA";
-var ASSESS_ID    = "1FLIugt_XASi_vsP7FHdL2UVthQQDsdZpH6St3zVofMU";
+var AREA_ID      = "1Yb5CFwZDp9nF0M7NUhjo3hulS_GNZelG";
+var ASSESS_ID    = "1FLIugt_XASi_vsP7FHdL2UVthQQDsdZpH6St3zVofMU"; // = Employee Master ทั้งไฟล์ (Employee/HQ/Resigned employee/Training/Assessment)
 
 var RATING_MAP = {"Very good":4,"Good":3,"Quite Good":2,"Moderate":1,"Needs Improvement":0};
 
@@ -25,7 +33,7 @@ function doGet(e) {
   try {
     var act = p.action || "all";
     if (act === "all") {
-      out = {status:"success", timestamp:new Date().toISOString(), year:year, survey:getSurveyData(year), cost:getCostData(year), asset:getAssetData(), oar:getOarData(year), area:getAreaData(), assessment:getAssessmentData()};
+      out = {status:"success", timestamp:new Date().toISOString(), year:year, survey:getSurveyData(year), cost:getCostData(year), asset:getAssetData(), oar:getOarData(year), area:getAreaData(), assessment:getAssessmentData(), employee:getEmployeeManagementData(), academy:getAcademyData()};
     } else if (act === "survey") {
       out = getSurveyData(year);
     } else if (act === "cost") {
@@ -38,6 +46,10 @@ function doGet(e) {
       out = getAreaData();
     } else if (act === "assessment") {
       out = getAssessmentData();
+    } else if (act === "employee") {
+      out = getEmployeeManagementData();
+    } else if (act === "academy") {
+      out = getAcademyData();
     } else if (act === "ping") {
       out = {status:"success", message:"pong", timestamp:new Date().toISOString()};
     } else {
@@ -124,9 +136,14 @@ function getSurveyData(year) {
       if (rc > 0) cSum += rs / rc;
 
       if (trC >= 0 && row[trC]) {
-        var tn = String(row[trC]).trim();
+        // ตัดคำต่อท้าย "(Department)" ออก เช่น "Jets (Sales & Service)" -> name="Jets", dept="Sales & Service"
+        var tnRaw = String(row[trC]).trim();
+        var tnMatch = tnRaw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+        var tn = tnMatch ? tnMatch[1].trim() : tnRaw;
+        var dept = tnMatch ? tnMatch[2].trim() : "";
         if (tn) {
-          if (!trainerStats[tn]) trainerStats[tn] = {ts: 0, c: 0, cs: {}};
+          if (!trainerStats[tn]) trainerStats[tn] = {ts: 0, c: 0, cs: {}, dept: dept};
+          if (dept && !trainerStats[tn].dept) trainerStats[tn].dept = dept;
           if (rc > 0) {
             trainerStats[tn].ts += rs / rc;
             trainerStats[tn].c++;
@@ -147,10 +164,24 @@ function getSurveyData(year) {
     }
   }
 
+  // L&D leadership tier — รายชื่อจริงตาม org_structure.py (single source of truth ของบอท)
+  // หัวหน้า/ผู้จัดการ เทรนน้อยกว่าน้องๆทีมเป็นปกติ เพราะงานหลักคือบริหาร ไม่ใช่สอนเอง
+  var TIER_HEAD = ["Peanut", "Jame", "Judy", "Jib", "Fair"];
+  var TIER_ASST = ["Pui", "Jajah", "Jajh"]; // เผื่อสะกดต่างกันในชีตจริง
+  function _trainerTier(name) {
+    if (TIER_HEAD.indexOf(name) >= 0) return "head";
+    if (TIER_ASST.indexOf(name) >= 0) return "asst";
+    return "trainer";
+  }
+
   var trR = [];
   for (var k in trainerStats) {
     var t = trainerStats[k];
-    trR.push({name: k, avg: t.c ? _r2(t.ts / t.c) : 0, count: t.c, courses: t.cs});
+    trR.push({
+      name: k, avg: t.c ? _r2(t.ts / t.c) : 0, count: t.c, courses: t.cs,
+      department: t.dept || "", tier: _trainerTier(k),
+      kpi_score: null // placeholder — จะมีค่าจริงตอนเชื่อม sheet ประเมิน KPI ในอนาคต
+    });
   }
   trR.sort(function(a, b) { return b.avg - a.avg; });
 
@@ -452,7 +483,11 @@ function getOarData(year) {
 }
 
 // ============================================================
-// AREA — Area Performance Data
+// AREA — Area Performance Data (v10: โครงสร้าง Area1-Area8 ใหม่)
+// ชื่อ/หัวหน้างาน/L&D staff ต่อ area อ้างตาม org_structure.py ของบอท (single source of truth)
+// หมายเหตุ: สเปรดชีตนี้เพิ่งสร้างใหม่สำหรับรอบรายงาน Jun-Nov 2026 — คอลัมน์ identity
+// (branch/name/position ฯลฯ) มีข้อมูลแล้ว แต่ตัวเลข performance ส่วนใหญ่ยังเป็น 0
+// จนกว่าทีม L&D จะกรอกข้อมูลรายเดือน — ไม่ใช่บั๊ก เป็นเรื่องคาดหมายไว้แล้ว
 // ============================================================
 function getAreaData() {
   // --- inline helpers ---
@@ -478,18 +513,24 @@ function getAreaData() {
   catch(e) { return {status:"error", message:"Cannot open Area sheet: " + e}; }
 
   var AREA_MAP = {
-    "MS": {name: "Megastore", empSheet: "MS-Employee", storeSheet: "MS-Store", learnSheet: "MS-Learning"},
-    "MT": {name: "Metropolitan", empSheet: "MT-Employee", storeSheet: "MT-Store", learnSheet: "MT-Learning"},
-    "NC": {name: "North+Central", empSheet: "NC-Employee", storeSheet: "NC-Store", learnSheet: "NC-Learning"},
-    "WN": {name: "West+NE", empSheet: "WN-Employee", storeSheet: "WN-Store", learnSheet: "WN-Learning"},
-    "SE": {name: "South+Eastern", empSheet: "SE-Employee", storeSheet: "SE-Store", learnSheet: "SE-Learning"}
+    "Area1": {name: "Area 1", svAm: "SV Mink",   ldStaff: ["Trin","Toy","Milk"],       empSheet: "A1-Employee", storeSheet: "A1-Store", learnSheet: "A1-Learning"},
+    "Area2": {name: "Area 2", svAm: "SV Meelap",  ldStaff: ["Kwang","Tonpalm","Benz"],  empSheet: "A2-Employee", storeSheet: "A2-Store", learnSheet: "A2-Learning"},
+    "Area3": {name: "Area 3", svAm: "SV Bow",     ldStaff: ["Kio","Nueng","Looklew"],   empSheet: "A3-Employee", storeSheet: "A3-Store", learnSheet: "A3-Learning"},
+    "Area4": {name: "Area 4", svAm: "SV Ko",      ldStaff: ["Pui","Mark"],              empSheet: "A4-Employee", storeSheet: "A4-Store", learnSheet: "A4-Learning"},
+    "Area5": {name: "Area 5", svAm: "SV Juji",    ldStaff: ["Jajah","Jets"],            empSheet: "A5-Employee", storeSheet: "A5-Store", learnSheet: "A5-Learning"},
+    "Area6": {name: "Area 6", svAm: "AM Chock",   ldStaff: ["Jib"],                     empSheet: "A6-Employee", storeSheet: "A6-Store", learnSheet: "A6-Learning"},
+    "Area7": {name: "Area 7", svAm: "SV Champ",   ldStaff: ["Fair"],                    empSheet: "A7-Employee", storeSheet: "A7-Store", learnSheet: "A7-Learning"},
+    "Area8": {name: "Area 8", svAm: "AM Aom",     ldStaff: ["Judy"],                    empSheet: "A8-Employee", storeSheet: "A8-Store", learnSheet: "A8-Learning"}
   };
 
   var result = {status: "success", areas: {}};
 
   for (var areaCode in AREA_MAP) {
     var cfg = AREA_MAP[areaCode];
-    var areaResult = {name: cfg.name, employee_summary: {}, store_summary: {}, learning_summary: {}};
+    var areaResult = {
+      name: cfg.name, sv_am: cfg.svAm, ld_staff: cfg.ldStaff,
+      employee_summary: {}, store_summary: {}, learning_summary: {}
+    };
 
     // === EMPLOYEE SHEET ===
     try {
@@ -505,10 +546,12 @@ function getAreaData() {
           var cGrade = _colIdx(empHdr, "Grade");
           var cProb = _colIdx(empHdr, "Probation Status");
           var cObt = _colIdx(empHdr, "OBT Status");
+          var cTalent = _colIdx(empHdr, "Talent");
+          var cNextCourse = _colIdx(empHdr, "Next Course");
 
           var total = 0, probation = 0, confirmed = 0;
           var obtPass = 0, obtProg = 0, obtNot = 0;
-          var g1 = 0, g2 = 0, g3 = 0, evalGap = 0;
+          var g1 = 0, g2 = 0, g3 = 0, evalGap = 0, talentCount = 0, needsNextCourse = 0;
 
           for (var r2 = empHdrRow + 1; r2 < empData.length; r2++) {
             var row = empData[r2];
@@ -518,15 +561,13 @@ function getAreaData() {
             if (cProb >= 0) {
               var ps = String(row[cProb]).trim();
               if (ps === "Confirmed") confirmed++;
-              else if (ps.indexOf("Probation") >= 0 || ps === "Probation") probation++;
               else probation++;
             }
 
             if (cObt >= 0) {
               var os = String(row[cObt]).trim();
               if (os === "Pass") obtPass++;
-              else if (os === "In Progress" || os.indexOf("Progress") >= 0) obtProg++;
-              else if (os === "Not Started" || os === "" || os === "NaN") obtNot++;
+              else if (os.indexOf("Progress") >= 0) obtProg++;
               else obtNot++;
             }
 
@@ -536,6 +577,12 @@ function getAreaData() {
               else if (gr === "2nd") g2++;
               else if (gr === "3rd") g3++;
             }
+
+            if (cTalent >= 0) {
+              var tl = String(row[cTalent]).trim().toUpperCase();
+              if (tl === "Y" || tl === "YES") talentCount++;
+            }
+            if (cNextCourse >= 0 && String(row[cNextCourse]).trim()) needsNextCourse++;
           }
           evalGap = total - (g1 + g2 + g3);
           if (evalGap < 0) evalGap = 0;
@@ -543,7 +590,8 @@ function getAreaData() {
           areaResult.employee_summary = {
             total: total, probation: probation, confirmed: confirmed,
             obt_pass: obtPass, obt_in_progress: obtProg, obt_not_started: obtNot,
-            grade_1st: g1, grade_2nd: g2, grade_3rd: g3, eval_gap: evalGap
+            grade_1st: g1, grade_2nd: g2, grade_3rd: g3, eval_gap: evalGap,
+            talent_count: talentCount, needs_next_course: needsNextCourse
           };
         }
       }
@@ -564,14 +612,16 @@ function getAreaData() {
           var cNps = _colIdx(stHdr, "NPS");
           var cAcc = _colIdx(stHdr, "Accuracy");
           var cSelfEye = _colIdx(stHdr, "Self Eye-test");
+          var cClRev = _colIdx(stHdr, "CL Revenue");
           var cSalesAvg = _colIdx(stHdr, "Sales Avg");
           var cTotalSale = _colIdx(stHdr, "Total Sale");
+          var cSalesAch = _colIdx(stHdr, "Sales Achievement");
           var cComplaint = _colIdx(stHdr, "Complaint");
           var cRedFlag = _colIdx(stHdr, "Red Flag");
 
-          var sumTopup = 0, sumNps = 0, sumAcc = 0, sumSelf = 0;
-          var sumSalesAvg = 0, sumTotalSale = 0, sumComplaints = 0, sumRedFlags = 0;
-          var nTopup = 0, nNps = 0, nAcc = 0, nSelf = 0, nSalesAvg = 0, stRows = 0;
+          var sumTopup = 0, sumNps = 0, sumAcc = 0, sumSelf = 0, sumClRev = 0;
+          var sumSalesAvg = 0, sumSalesAch = 0, sumTotalSale = 0, sumComplaints = 0, sumRedFlags = 0;
+          var nTopup = 0, nNps = 0, nAcc = 0, nSelf = 0, nClRev = 0, nSalesAvg = 0, nSalesAch = 0, stRows = 0;
 
           for (var r4 = stHdrRow + 1; r4 < stData.length; r4++) {
             var srow = stData[r4];
@@ -582,7 +632,9 @@ function getAreaData() {
             if (cNps >= 0) { var vn = _pNum(srow[cNps]); if (vn > 0) { sumNps += vn; nNps++; } }
             if (cAcc >= 0) { var va = _pNum(srow[cAcc]); if (va > 0) { sumAcc += va; nAcc++; } }
             if (cSelfEye >= 0) { var vs = _pNum(srow[cSelfEye]); if (vs > 0) { sumSelf += vs; nSelf++; } }
+            if (cClRev >= 0) { var vc = _pNum(srow[cClRev]); if (vc > 0) { sumClRev += vc; nClRev++; } }
             if (cSalesAvg >= 0) { var vsa = _pNum(srow[cSalesAvg]); if (vsa > 0) { sumSalesAvg += vsa; nSalesAvg++; } }
+            if (cSalesAch >= 0) { var vac = _pNum(srow[cSalesAch]); if (vac > 0) { sumSalesAch += vac; nSalesAch++; } }
             if (cTotalSale >= 0) { sumTotalSale += _pNum(srow[cTotalSale]); }
             if (cComplaint >= 0) { sumComplaints += _pNum(srow[cComplaint]); }
             if (cRedFlag >= 0) {
@@ -597,7 +649,9 @@ function getAreaData() {
             avg_nps: nNps ? _r2(sumNps / nNps) : 0,
             avg_accuracy: nAcc ? _r2(sumAcc / nAcc) : 0,
             avg_self_eyetest: nSelf ? _r2(sumSelf / nSelf) : 0,
+            avg_cl_revenue_share: nClRev ? _r2(sumClRev / nClRev) : 0,
             avg_sales_per_emp: nSalesAvg ? _r2(sumSalesAvg / nSalesAvg) : 0,
+            avg_sales_achievement: nSalesAch ? _r2(sumSalesAch / nSalesAch) : 0,
             total_sale: _r2(sumTotalSale),
             total_complaints: sumComplaints,
             total_redflags: sumRedFlags
@@ -623,10 +677,13 @@ function getAreaData() {
           var cSurveyAvg = _colIdx(lnHdr, "Survey Avg");
           var cSurveyVg = _colIdx(lnHdr, "Survey Very Good");
           var cObtSess = _colIdx(lnHdr, "OBT Sessions");
+          var cObtPass = _colIdx(lnHdr, "OBT Pass");
+          var cConnectUsers = _colIdx(lnHdr, "Connect Active Users");
           var cCerts = _colIdx(lnHdr, "New Grade");
+          var cEvalGapCol = _colIdx(lnHdr, "Eval Gap");
 
-          var tClasses = 0, tHours = 0, tParts = 0, tObtSess = 0, tCerts = 0;
-          var tSurvey = 0, nSurvey = 0, tSurveyVg = 0, nSurveyVg = 0;
+          var tClasses = 0, tHours = 0, tParts = 0, tObtSess = 0, tCerts = 0, tConnectUsers = 0, tEvalGapCol = 0;
+          var tSurvey = 0, nSurvey = 0, tSurveyVg = 0, nSurveyVg = 0, tObtPass = 0, nObtPass = 0;
 
           for (var r6 = lnHdrRow + 1; r6 < lnData.length; r6++) {
             var lrow = lnData[r6];
@@ -638,8 +695,11 @@ function getAreaData() {
             if (cParts >= 0) tParts += _pNum(lrow[cParts]);
             if (cObtSess >= 0) tObtSess += _pNum(lrow[cObtSess]);
             if (cCerts >= 0) tCerts += _pNum(lrow[cCerts]);
+            if (cConnectUsers >= 0) tConnectUsers += _pNum(lrow[cConnectUsers]);
+            if (cEvalGapCol >= 0) tEvalGapCol += _pNum(lrow[cEvalGapCol]);
             if (cSurveyAvg >= 0) { var svA = _pNum(lrow[cSurveyAvg]); if (svA > 0) { tSurvey += svA; nSurvey++; } }
             if (cSurveyVg >= 0) { var svV = _pNum(lrow[cSurveyVg]); if (svV > 0) { tSurveyVg += svV; nSurveyVg++; } }
+            if (cObtPass >= 0) { var obp = _pNum(lrow[cObtPass]); if (obp > 0) { tObtPass += obp; nObtPass++; } }
           }
 
           areaResult.learning_summary = {
@@ -648,8 +708,11 @@ function getAreaData() {
             total_participants: tParts,
             avg_survey: nSurvey ? _r2(tSurvey / nSurvey) : 0,
             avg_survey_vg: nSurveyVg ? _r2(tSurveyVg / nSurveyVg) : 0,
+            avg_obt_pass_pct: nObtPass ? _r2(tObtPass / nObtPass) : 0,
             total_obt_sessions: tObtSess,
-            total_certs: tCerts
+            total_connect_users: tConnectUsers,
+            total_certs: tCerts,
+            eval_gap_from_learning: tEvalGapCol
           };
         }
       }
@@ -766,4 +829,245 @@ function getAssessmentData() {
     total: employees.length,
     employees: employees
   };
+}
+
+// ============================================================
+// EMPLOYEE MANAGEMENT (v10 ใหม่)
+// ไฟล์เดียวกับ Assessment (ASSESS_ID = Employee Master ทั้งไฟล์):
+//   Employee (หน้าร้าน), HQ (office), Resigned employee, Training, Assessment
+// + OAR (OAR_ID) ทั้ง 2 tab: Registrations = ลงในคลาส, Registration (OBT) = OBT
+// ============================================================
+function getEmployeeManagementData() {
+  // --- inline helpers ---
+  function _colIdx(hdr, kw) {
+    for (var i = 0; i < hdr.length; i++) {
+      var h = String(hdr[i]).replace(/\n/g, " ").trim();
+      if (h.indexOf(kw) >= 0) return i;
+    }
+    return -1;
+  }
+  function _monthKey(v) {
+    if (!v) return "";
+    var s = String(v);
+    if (s.match(/^\d{4}-\d{2}/)) return s.substring(0, 7);
+    try {
+      var d = new Date(v);
+      if (!isNaN(d.getTime())) return Utilities.formatDate(d, "Asia/Bangkok", "yyyy-MM");
+    } catch(ex) {}
+    return "";
+  }
+  // Employee และ HQ ใช้หัวคอลัมน์ชุดเดียวกัน (EmpID...Grade) — ใช้ helper ร่วม
+  function _summarizeStaffSheet(sheet) {
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) {
+      return {total: 0, active: 0, resigned: 0, language_count: 0, grade_1st: 0, grade_2nd: 0, grade_3rd: 0, no_grade: 0};
+    }
+    var hdr = data[0];
+    var cStatus = _colIdx(hdr, "Status");
+    var cLang = _colIdx(hdr, "language");
+    var cGrade = _colIdx(hdr, "Grade");
+
+    var total = 0, active = 0, resigned = 0, langCount = 0, g1 = 0, g2 = 0, g3 = 0, noGrade = 0;
+    for (var r = 1; r < data.length; r++) {
+      var row = data[r];
+      if (!row[0] || String(row[0]).trim() === "") continue;
+      total++;
+
+      var status = cStatus >= 0 ? String(row[cStatus]).trim() : "";
+      if (status === "Resign") resigned++; else active++;
+
+      if (cLang >= 0) {
+        var lang = String(row[cLang]).trim();
+        if (lang && lang !== "-" && lang.toLowerCase() !== "null") langCount++;
+      }
+
+      if (cGrade >= 0) {
+        var gr = String(row[cGrade]).trim();
+        if (gr === "1" || gr === "1st") g1++;
+        else if (gr === "2" || gr === "2nd") g2++;
+        else if (gr === "3" || gr === "3rd") g3++;
+        else noGrade++;
+      }
+    }
+    return {total: total, active: active, resigned: resigned, language_count: langCount, grade_1st: g1, grade_2nd: g2, grade_3rd: g3, no_grade: noGrade};
+  }
+  // --- end helpers ---
+
+  var out = {
+    status: "success",
+    store_staff: {}, office_staff: {}, resigned_monthly: {},
+    not_yet_trained: {}, not_yet_passed: 0,
+    oar_monthly: {in_class: {}, obt: {}}
+  };
+
+  var ss;
+  try { ss = SpreadsheetApp.openById(ASSESS_ID); }
+  catch(e) { return {status:"error", message:"Cannot open Employee Master: " + e}; }
+
+  // === Employee (หน้าร้าน) ===
+  try {
+    var empSh = ss.getSheetByName("Employee");
+    out.store_staff = empSh ? _summarizeStaffSheet(empSh) : {error: "Sheet 'Employee' not found"};
+  } catch(ex) { out.store_staff = {error: ex.toString()}; }
+
+  // === HQ (office) ===
+  try {
+    var hqSh = ss.getSheetByName("HQ");
+    out.office_staff = hqSh ? _summarizeStaffSheet(hqSh) : {error: "Sheet 'HQ' not found"};
+  } catch(ex) { out.office_staff = {error: ex.toString()}; }
+
+  // === Resigned employee — จำนวนลาออกต่อเดือน ===
+  try {
+    var resSh = ss.getSheetByName("Resigned employee");
+    if (resSh) {
+      var resData = resSh.getDataRange().getValues();
+      if (resData.length >= 2) {
+        var resHdr = resData[0];
+        var cResignDate = _colIdx(resHdr, "Resign Date");
+        if (cResignDate < 0) cResignDate = _colIdx(resHdr, "Last date");
+        var monthly = {};
+        for (var r = 1; r < resData.length; r++) {
+          var row = resData[r];
+          if (!row[0] || String(row[0]).trim() === "") continue;
+          var mk = cResignDate >= 0 ? _monthKey(row[cResignDate]) : "";
+          if (!mk) mk = "unknown";
+          monthly[mk] = (monthly[mk] || 0) + 1;
+        }
+        out.resigned_monthly = monthly;
+      }
+    } else {
+      out.resigned_monthly = {error: "Sheet 'Resigned employee' not found"};
+    }
+  } catch(ex) { out.resigned_monthly = {error: ex.toString()}; }
+
+  // === Training — จำนวนคนยังไม่ได้เทรนต่อคอร์ส (matrix P/blank แบบเดียวกับ Assessment) ===
+  try {
+    var trainSh = ss.getSheetByName("Training");
+    if (trainSh) {
+      var trainData = trainSh.getDataRange().getValues();
+      if (trainData.length >= 2) {
+        var trainHdr = trainData[0];
+        var COURSES = ["1st BCL","2nd BCL","3rd BCL","1st GBT","2nd GBT","1st SMT","2nd SMT","MCL [OP]","MCL [OD]","MTCL [OP]","MTCL [OD]"];
+        var courseCols = {};
+        var anyFound = false;
+        for (var ci = 0; ci < COURSES.length; ci++) {
+          var idx = _colIdx(trainHdr, COURSES[ci]);
+          courseCols[COURSES[ci]] = idx;
+          if (idx >= 0) anyFound = true;
+        }
+        if (anyFound) {
+          var totalRows = 0, notTrained = {};
+          for (var ck in courseCols) notTrained[ck] = 0;
+          for (var r2 = 1; r2 < trainData.length; r2++) {
+            var trow = trainData[r2];
+            if (!trow[0] || String(trow[0]).trim() === "") continue;
+            totalRows++;
+            for (var ck2 in courseCols) {
+              var col = courseCols[ck2];
+              if (col >= 0) {
+                var val = String(trow[col]).trim().toUpperCase();
+                if (val !== "P" && val !== "PASS") notTrained[ck2]++;
+              }
+            }
+          }
+          out.not_yet_trained = {total_staff: totalRows, per_course: notTrained};
+        } else {
+          // โครงสร้างจริงไม่ตรงที่คาดไว้ — ส่งหัวคอลัมน์ที่เจอจริงกลับไปด้วยเพื่อ debug ต่อได้ทันที
+          out.not_yet_trained = {error: "Training sheet header ไม่ตรงกับ course columns ที่คาดไว้", headers_found: trainHdr};
+        }
+      }
+    } else {
+      out.not_yet_trained = {error: "Sheet 'Training' not found"};
+    }
+  } catch(ex) { out.not_yet_trained = {error: ex.toString()}; }
+
+  // === Assessment — จำนวนคนสถานะ Pass (ยัง active) แต่ยังไม่มี grade ===
+  try {
+    var assessData = getAssessmentData();
+    if (assessData.status === "success") {
+      out.not_yet_passed = assessData.employees.filter(function(e) {
+        return e.status === "Pass" && !e.grade;
+      }).length;
+    } else {
+      out.not_yet_passed = {error: assessData.message};
+    }
+  } catch(ex) { out.not_yet_passed = {error: ex.toString()}; }
+
+  // === OAR — ลงทะเบียนในคลาส vs OBT ต่อเดือน ===
+  try {
+    var oarSs = SpreadsheetApp.openById(OAR_ID);
+    var tabs = [{name: "Registrations", key: "in_class"}, {name: "Registration (OBT)", key: "obt"}];
+    for (var ti = 0; ti < tabs.length; ti++) {
+      var tabInfo = tabs[ti];
+      var tSheet = oarSs.getSheetByName(tabInfo.name);
+      if (!tSheet) { out.oar_monthly[tabInfo.key] = {error: "Sheet '" + tabInfo.name + "' not found"}; continue; }
+      var tData = tSheet.getDataRange().getValues();
+      if (tData.length < 2) { out.oar_monthly[tabInfo.key] = {}; continue; }
+      var tHdr = tData[0];
+      var cDate = _colIdx(tHdr, "Training Date");
+      if (cDate < 0) cDate = _colIdx(tHdr, "Timestamp");
+      var cFullName = _colIdx(tHdr, "Full Name");
+      var monthly2 = {};
+      for (var r3 = 1; r3 < tData.length; r3++) {
+        var trow2 = tData[r3];
+        if (cFullName >= 0 && String(trow2[cFullName]).trim() === "") continue;
+        var mk2 = cDate >= 0 ? _monthKey(trow2[cDate]) : "";
+        if (!mk2) mk2 = "unknown";
+        monthly2[mk2] = (monthly2[mk2] || 0) + 1;
+      }
+      out.oar_monthly[tabInfo.key] = monthly2;
+    }
+  } catch(ex) { out.oar_monthly = {error: ex.toString()}; }
+
+  return out;
+}
+
+// ============================================================
+// ACADEMY (v10 ใหม่) — สรุปภาพรวม L&D จากทุก action ไว้ที่เดียว
+// ฉบับดราฟ — ปรับเพิ่ม/ลดตัวเลขได้ทีหลังตามที่คุยกัน
+// ============================================================
+function getAcademyData() {
+  try {
+    var survey = getSurveyData("");
+    var assessment = getAssessmentData();
+    var employee = getEmployeeManagementData();
+    var cost = getCostData("");
+    var asset = getAssetData();
+
+    var activeAssess = (assessment.status === "success")
+      ? assessment.employees.filter(function(e){ return e.status === "Pass"; })
+      : [];
+    var gradedCount = activeAssess.filter(function(e){ return !!e.grade; }).length;
+
+    return {
+      status: "success",
+      generated_at: new Date().toISOString(),
+      headcount: {
+        store: (employee.store_staff && employee.store_staff.total) || 0,
+        office: (employee.office_staff && employee.office_staff.total) || 0
+      },
+      assessment: {
+        active_total: activeAssess.length,
+        graded: gradedCount,
+        not_yet_passed: employee.not_yet_passed
+      },
+      training: {
+        total_responses: survey.total_responses || 0,
+        overall_avg: survey.overall_avg || 0,
+        trainer_count: survey.trainers ? survey.trainers.length : 0
+      },
+      cost: {
+        budget: cost.budget || 0,
+        actual: cost.actual || 0,
+        balance: cost.balance || 0
+      },
+      asset: {
+        total_laptops: asset.total_laptops || 0,
+        total_ipads: asset.total_ipads || 0,
+        issues: asset.issues || 0
+      }
+    };
+  } catch(ex) {
+    return {status: "error", message: ex.toString()};
+  }
 }
