@@ -16,12 +16,18 @@
 //   - getSurveyData(): ตัดคำต่อท้าย "(Department)" ออกจากชื่อ trainer, แนบ tier
 //     (head/asst/trainer) ตามรายชื่อ L&D จริงที่ปรากฏใน Main Trainer column
 //   - เพิ่ม action=academy — getAcademyData() สรุปเลขหลักๆจากทุก action รวมไว้ที่เดียว
+//   - เพิ่ม action=od_connect — getOdConnectData() ดึงสรุปการใช้งาน OD-Connect จาก
+//     Google Analytics 4 (GA4 Data API) ตรงจาก Code.gs เอง ผ่าน service account
+//     JWT (เก็บ key ไว้ใน Script Properties ชื่อ GA4_SERVICE_ACCOUNT_JSON — ดูวิธี
+//     setup ในคอมเมนต์เหนือ getOdConnectData). ไม่รวมอยู่ใน action=all เพราะเป็น
+//     external API call ที่หนักกว่าปกติ — ให้ frontend ดึงเฉพาะตอนเปิด tab นี้เท่านั้น
 // ============================================================
 var SURVEY_ID    = "1RlnQEXOJ3EPwqnuDLMk3rjBvinJbW1wKFcRyMfdlEVs";
 var DASHBOARD_ID = "1QKjyFlmJrgmiYHagn7olhpr41ucQJQc8ck3zae8obJI";
 var OAR_ID       = "1Ux83yvg3sdANd8_OB104Np9jartOfEF9_xhoX5JslSU";
 var AREA_ID      = "1Yb5CFwZDp9nF0M7NUhjo3hulS_GNZelG";
 var ASSESS_ID    = "1FLIugt_XASi_vsP7FHdL2UVthQQDsdZpH6St3zVofMU"; // = Employee Master ทั้งไฟล์ (Employee/HQ/Resigned employee/Training/Assessment)
+var GA4_PROPERTY_ID = "539554359"; // จาก analytics.google.com/analytics/web/#/a268231845p539554359
 
 var RATING_MAP = {"Very good":4,"Good":3,"Quite Good":2,"Moderate":1,"Needs Improvement":0};
 
@@ -50,6 +56,8 @@ function doGet(e) {
       out = getEmployeeManagementData();
     } else if (act === "academy") {
       out = getAcademyData();
+    } else if (act === "od_connect") {
+      out = getOdConnectData(p.days ? parseInt(p.days, 10) : 28);
     } else if (act === "ping") {
       out = {status:"success", message:"pong", timestamp:new Date().toISOString()};
     } else {
@@ -1066,6 +1074,162 @@ function getAcademyData() {
         total_ipads: asset.total_ipads || 0,
         issues: asset.issues || 0
       }
+    };
+  } catch(ex) {
+    return {status: "error", message: ex.toString()};
+  }
+}
+
+// ============================================================
+// OD-CONNECT (v10 ใหม่) — สรุปการใช้งาน od-connect.com จาก Google Analytics 4
+// เพื่อประมวลผล digital transformation ขององค์กร
+//
+// วิธี setup (ทำครั้งเดียว โดยคุณเอง — ผมไม่มีสิทธิ์เข้า Google Cloud/Analytics ให้):
+//   1. console.cloud.google.com -> เลือก/สร้าง project -> เปิดใช้ "Google Analytics Data API"
+//   2. IAM & Admin > Service Accounts > Create Service Account (ไม่ต้องให้สิทธิ์ project ใดๆ)
+//   3. เปิด service account ที่สร้าง -> Keys -> Add Key -> Create new key -> JSON -> ดาวน์โหลดไฟล์
+//   4. ไปที่ analytics.google.com -> Admin -> Property Access Management ของ property
+//      539554359 (a268231845p539554359) -> Add users -> ใส่อีเมล service account
+//      (หน้าตาแบบ xxx@xxx.iam.gserviceaccount.com จากไฟล์ JSON ข้อ 3) -> สิทธิ์ Viewer พอ
+//   5. ใน Apps Script editor: Project Settings (รูปเฟือง) > Script Properties > Add script property
+//      key = GA4_SERVICE_ACCOUNT_JSON, value = เนื้อไฟล์ JSON ทั้งไฟล์จากข้อ 3 (วางทั้งบล็อคได้เลย)
+//   ห้ามวาง service account key ลงในโค้ดตรงนี้เด็ดขาด — เก็บไว้ใน Script Properties เท่านั้น
+// ============================================================
+function _getGA4AccessToken() {
+  var props = PropertiesService.getScriptProperties();
+  var saJson = props.getProperty("GA4_SERVICE_ACCOUNT_JSON");
+  if (!saJson) throw new Error("GA4_SERVICE_ACCOUNT_JSON ยังไม่ได้ตั้งค่าใน Script Properties");
+  var sa = JSON.parse(saJson);
+
+  function _b64url(obj) {
+    return Utilities.base64EncodeWebSafe(JSON.stringify(obj)).replace(/=+$/, "");
+  }
+
+  var now = Math.floor(Date.now() / 1000);
+  var header = {alg: "RS256", typ: "JWT"};
+  var claimSet = {
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/analytics.readonly",
+    aud: "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now
+  };
+
+  var toSign = _b64url(header) + "." + _b64url(claimSet);
+  var signatureBytes = Utilities.computeRsaSha256Signature(toSign, sa.private_key);
+  var signature = Utilities.base64EncodeWebSafe(signatureBytes).replace(/=+$/, "");
+  var jwt = toSign + "." + signature;
+
+  var resp = UrlFetchApp.fetch("https://oauth2.googleapis.com/token", {
+    method: "post",
+    payload: {
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt
+    },
+    muteHttpExceptions: true
+  });
+  var result = JSON.parse(resp.getContentText());
+  if (!result.access_token) throw new Error("GA4 auth failed: " + resp.getContentText());
+  return result.access_token;
+}
+
+function _ga4RunReport(body) {
+  var token = _getGA4AccessToken();
+  var url = "https://analyticsdata.googleapis.com/v1beta/properties/" + GA4_PROPERTY_ID + ":runReport";
+  var resp = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    headers: {Authorization: "Bearer " + token},
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true
+  });
+  var json = JSON.parse(resp.getContentText());
+  if (json.error) throw new Error("GA4 API error: " + JSON.stringify(json.error));
+  return json;
+}
+
+function getOdConnectData(days) {
+  days = days || 28;
+  try {
+    var dateRange = [{startDate: days + "daysAgo", endDate: "today"}];
+
+    // --- Overview ---
+    var overviewResp = _ga4RunReport({
+      dateRanges: dateRange,
+      metrics: [
+        {name: "sessions"}, {name: "activeUsers"}, {name: "newUsers"},
+        {name: "screenPageViews"}, {name: "bounceRate"}, {name: "averageSessionDuration"}
+      ]
+    });
+    var ov = (overviewResp.rows && overviewResp.rows[0] && overviewResp.rows[0].metricValues) || [];
+    var overview = {
+      sessions: ov[0] ? Number(ov[0].value) : 0,
+      active_users: ov[1] ? Number(ov[1].value) : 0,
+      new_users: ov[2] ? Number(ov[2].value) : 0,
+      page_views: ov[3] ? Number(ov[3].value) : 0,
+      bounce_rate_pct: ov[4] ? Math.round(Number(ov[4].value) * 10000) / 100 : 0,
+      avg_session_sec: ov[5] ? Math.round(Number(ov[5].value)) : 0
+    };
+
+    // --- Daily trend (สำหรับกราฟเส้น) ---
+    var trendResp = _ga4RunReport({
+      dateRanges: dateRange,
+      dimensions: [{name: "date"}],
+      metrics: [{name: "sessions"}, {name: "activeUsers"}],
+      orderBys: [{dimension: {dimensionName: "date"}}]
+    });
+    var trend = (trendResp.rows || []).map(function(row) {
+      return {
+        date: row.dimensionValues[0].value,
+        sessions: Number(row.metricValues[0].value),
+        users: Number(row.metricValues[1].value)
+      };
+    });
+
+    // --- Top pages ---
+    var pagesResp = _ga4RunReport({
+      dateRanges: dateRange,
+      dimensions: [{name: "pagePath"}],
+      metrics: [{name: "screenPageViews"}, {name: "activeUsers"}],
+      orderBys: [{metric: {metricName: "screenPageViews"}, desc: true}],
+      limit: 10
+    });
+    var topPages = (pagesResp.rows || []).map(function(row) {
+      return {path: row.dimensionValues[0].value, page_views: Number(row.metricValues[0].value), users: Number(row.metricValues[1].value)};
+    });
+
+    // --- Traffic sources ---
+    var sourceResp = _ga4RunReport({
+      dateRanges: dateRange,
+      dimensions: [{name: "sessionDefaultChannelGroup"}],
+      metrics: [{name: "sessions"}],
+      orderBys: [{metric: {metricName: "sessions"}, desc: true}],
+      limit: 8
+    });
+    var trafficSources = (sourceResp.rows || []).map(function(row) {
+      return {channel: row.dimensionValues[0].value, sessions: Number(row.metricValues[0].value)};
+    });
+
+    // --- Devices ---
+    var deviceResp = _ga4RunReport({
+      dateRanges: dateRange,
+      dimensions: [{name: "deviceCategory"}],
+      metrics: [{name: "sessions"}],
+      orderBys: [{metric: {metricName: "sessions"}, desc: true}]
+    });
+    var devices = (deviceResp.rows || []).map(function(row) {
+      return {device: row.dimensionValues[0].value, sessions: Number(row.metricValues[0].value)};
+    });
+
+    return {
+      status: "success",
+      property_id: GA4_PROPERTY_ID,
+      period_days: days,
+      overview: overview,
+      trend: trend,
+      top_pages: topPages,
+      traffic_sources: trafficSources,
+      devices: devices
     };
   } catch(ex) {
     return {status: "error", message: ex.toString()};
