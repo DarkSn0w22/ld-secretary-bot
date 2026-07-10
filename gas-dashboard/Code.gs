@@ -17,8 +17,8 @@
 //     (head/asst/trainer) ตามรายชื่อ L&D จริงที่ปรากฏใน Main Trainer column
 //   - เพิ่ม action=academy — getAcademyData() สรุปเลขหลักๆจากทุก action รวมไว้ที่เดียว
 //   - เพิ่ม action=od_connect — getOdConnectData() ดึงสรุปการใช้งาน OD-Connect จาก
-//     Google Analytics 4 (GA4 Data API) ตรงจาก Code.gs เอง ผ่าน service account
-//     JWT (เก็บ key ไว้ใน Script Properties ชื่อ GA4_SERVICE_ACCOUNT_JSON — ดูวิธี
+//     Google Analytics 4 (GA4 Data API) ตรงจาก Code.gs เอง ผ่าน ScriptApp.getOAuthToken()
+//     (ตัวตนของคนที่ deploy สคริปต์นี้ — ไม่ต้องมี service account/key แยก ดูวิธี
 //     setup ในคอมเมนต์เหนือ getOdConnectData). ไม่รวมอยู่ใน action=all เพราะเป็น
 //     external API call ที่หนักกว่าปกติ — ให้ frontend ดึงเฉพาะตอนเปิด tab นี้เท่านั้น
 // ============================================================
@@ -975,8 +975,9 @@ function getEmployeeManagementData() {
             for (var ck2 in courseCols) {
               var col = courseCols[ck2];
               if (col >= 0) {
-                var val = String(trow[col]).trim().toUpperCase();
-                if (val !== "P" && val !== "PASS") notTrained[ck2]++;
+                // Training tab เก็บวันที่เทรน ไม่ใช่ P/PASS แบบ Assessment — เซลล์มีค่า = เทรนแล้ว, เซลล์ว่าง/"-" = ยังไม่เทรน
+                var val = String(trow[col]).trim();
+                if (!val || val === "-" || val.toLowerCase() === "null") notTrained[ck2]++;
               }
             }
           }
@@ -1099,57 +1100,26 @@ function getAcademyData() {
 // OD-CONNECT (v10 ใหม่) — สรุปการใช้งาน od-connect.com จาก Google Analytics 4
 // เพื่อประมวลผล digital transformation ขององค์กร
 //
-// วิธี setup (ทำครั้งเดียว โดยคุณเอง — ผมไม่มีสิทธิ์เข้า Google Cloud/Analytics ให้):
-//   1. console.cloud.google.com -> เลือก/สร้าง project -> เปิดใช้ "Google Analytics Data API"
-//   2. IAM & Admin > Service Accounts > Create Service Account (ไม่ต้องให้สิทธิ์ project ใดๆ)
-//   3. เปิด service account ที่สร้าง -> Keys -> Add Key -> Create new key -> JSON -> ดาวน์โหลดไฟล์
-//   4. ไปที่ analytics.google.com -> Admin -> Property Access Management ของ property
-//      539554359 (a268231845p539554359) -> Add users -> ใส่อีเมล service account
-//      (หน้าตาแบบ xxx@xxx.iam.gserviceaccount.com จากไฟล์ JSON ข้อ 3) -> สิทธิ์ Viewer พอ
-//   5. ใน Apps Script editor: Project Settings (รูปเฟือง) > Script Properties > Add script property
-//      key = GA4_SERVICE_ACCOUNT_JSON, value = เนื้อไฟล์ JSON ทั้งไฟล์จากข้อ 3 (วางทั้งบล็อคได้เลย)
-//   ห้ามวาง service account key ลงในโค้ดตรงนี้เด็ดขาด — เก็บไว้ใน Script Properties เท่านั้น
+// Auth แบบง่าย: ใช้ตัวตน Google ของคนที่ deploy สคริปต์นี้เอง (ScriptApp.getOAuthToken())
+// ไม่ต้องสร้าง service account/key JSON แยก — เงื่อนไขคือบัญชี Google ที่ deploy ต้อง
+// มีสิทธิ์ดู GA4 property นี้อยู่แล้ว (ถ้าเปิดลิงก์ analytics.google.com/.../a268231845p539554359
+// แล้วเห็นข้อมูลปกติ = มีสิทธิ์แล้ว ไม่ต้องแชร์เพิ่ม)
+//
+// วิธี setup (ทำครั้งเดียว):
+//   1. เช็คว่า "Google Analytics Data API" เปิดใช้อยู่ใน GCP project ของสคริปต์นี้ไหม:
+//      Apps Script editor > Project Settings (รูปเฟือง) > ดู "Google Cloud Platform (GCP) Project"
+//      จะได้เลข project number -> ไปที่ console.cloud.google.com เลือก project นั้น (หรือค้นด้วย
+//      เลข project number) -> APIs & Services > Enable APIs -> ค้นหา "Google Analytics Data API" -> Enable
+//   2. Apps Script editor > Project Settings > ติ๊ก "Show appsscript.json manifest file in editor"
+//   3. เปิดไฟล์ appsscript.json ที่โผล่มาในรายการไฟล์ทางซ้าย -> เพิ่ม (ไม่ใช่แทนทั้งไฟล์) key
+//      "oauthScopes" ที่มี "https://www.googleapis.com/auth/analytics.readonly" รวมอยู่ด้วย
+//      พร้อมกับ scope เดิมที่สคริปต์นี้ใช้อยู่แล้ว (Sheets อ่าน + external request) — ถ้าไม่แน่ใจ
+//      โครงเดิมมีอะไรอยู่บ้าง ส่งเนื้อไฟล์ appsscript.json ปัจจุบันมาให้ดูก่อนได้ จะช่วย merge ให้ถูก
+//   4. Save แล้วรันฟังก์ชันไหนก็ได้ 1 ครั้งในตัว editor (เช่น doGet) เพื่อให้ Apps Script ขึ้น
+//      หน้าขอสิทธิ์ใหม่ (Authorize) -> กด Allow -> เสร็จแล้ว ไม่ต้องมี Script Property ใดๆเลย
 // ============================================================
-function _getGA4AccessToken() {
-  var props = PropertiesService.getScriptProperties();
-  var saJson = props.getProperty("GA4_SERVICE_ACCOUNT_JSON");
-  if (!saJson) throw new Error("GA4_SERVICE_ACCOUNT_JSON ยังไม่ได้ตั้งค่าใน Script Properties");
-  var sa = JSON.parse(saJson);
-
-  function _b64url(obj) {
-    return Utilities.base64EncodeWebSafe(JSON.stringify(obj)).replace(/=+$/, "");
-  }
-
-  var now = Math.floor(Date.now() / 1000);
-  var header = {alg: "RS256", typ: "JWT"};
-  var claimSet = {
-    iss: sa.client_email,
-    scope: "https://www.googleapis.com/auth/analytics.readonly",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now
-  };
-
-  var toSign = _b64url(header) + "." + _b64url(claimSet);
-  var signatureBytes = Utilities.computeRsaSha256Signature(toSign, sa.private_key);
-  var signature = Utilities.base64EncodeWebSafe(signatureBytes).replace(/=+$/, "");
-  var jwt = toSign + "." + signature;
-
-  var resp = UrlFetchApp.fetch("https://oauth2.googleapis.com/token", {
-    method: "post",
-    payload: {
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt
-    },
-    muteHttpExceptions: true
-  });
-  var result = JSON.parse(resp.getContentText());
-  if (!result.access_token) throw new Error("GA4 auth failed: " + resp.getContentText());
-  return result.access_token;
-}
-
 function _ga4RunReport(body) {
-  var token = _getGA4AccessToken();
+  var token = ScriptApp.getOAuthToken();
   var url = "https://analyticsdata.googleapis.com/v1beta/properties/" + GA4_PROPERTY_ID + ":runReport";
   var resp = UrlFetchApp.fetch(url, {
     method: "post",
