@@ -305,6 +305,18 @@ def run_friday_review_background():
         log_agent("scheduler", "system", "[friday_review] error", str(e), status="error")
 
 
+def run_guardian_check_background():
+    """รัน Guardian Weekly Dashboard Health Check ใน background thread"""
+    try:
+        from guardian_agent import run_weekly_check
+        print("[Scheduler] Launching Guardian Weekly Health Check...")
+        run_weekly_check(user_id=PEANUT_USER_ID)
+        print("[Scheduler] Guardian check completed ✓")
+    except Exception as e:
+        print(f"[Scheduler] Guardian check error: {e}")
+        log_agent("scheduler", "system", "[guardian] error", str(e), status="error")
+
+
 # ── Monday Meeting config (อ่านจาก schedule_config.json) ────────────────────
 _MEETING_DEFAULT_HOUR   = 9
 _MEETING_DEFAULT_MINUTE = 30
@@ -338,14 +350,32 @@ def get_review_time():
     return _REVIEW_DEFAULT_HOUR, _REVIEW_DEFAULT_MINUTE
 
 
+# ── Guardian Weekly Check config (อ่านจาก schedule_config.json) ─────────────
+_GUARDIAN_DEFAULT_HOUR   = 13
+_GUARDIAN_DEFAULT_MINUTE = 0
+
+def get_guardian_time():
+    """ดึงเวลา Guardian Weekly Check จาก schedule_config.json (default จันทร์ 13:00)"""
+    cfg = get_schedule_config()
+    for job in cfg.get("jobs", []):
+        if job.get("type") == "guardian_check" and job.get("enabled", True):
+            try:
+                hh, mm = job["time"].split(":")
+                return int(hh), int(mm)
+            except Exception:
+                pass
+    return _GUARDIAN_DEFAULT_HOUR, _GUARDIAN_DEFAULT_MINUTE
+
+
 def scheduler_loop():
     print("Scheduler started — morning 09:00 | Mon all-hands 09:30 "
-          "| Fri review 16:00 | watch 12:00")
+          "| Fri review 16:00 | watch 12:00 | Guardian check Mon 13:00")
     sent_today        = None
     sent_digest_hours = set()
     sent_watch_hours  = set()
     sent_meeting_week = None   # ISO week string "YYYY-WW"
     sent_review_week  = None   # ISO week string "YYYY-WW"
+    sent_guardian_week = None  # ISO week string "YYYY-WW"
 
     while True:
         now     = datetime.now(BANGKOK_TZ)
@@ -403,6 +433,21 @@ def scheduler_loop():
                 name="friday-review"
             )
             review_thread.start()
+
+        # ── Guardian Weekly Dashboard Health Check ──────────────────
+        gth, gtm = get_guardian_time()
+        if (weekday == 0 and                           # วันจันทร์
+                now.hour == gth and
+                now.minute == gtm and
+                sent_guardian_week != iso_wk):
+            print(f"[Scheduler] Guardian Weekly Health Check {now.strftime('%H:%M')}...")
+            sent_guardian_week = iso_wk
+            guardian_thread = threading.Thread(
+                target=run_guardian_check_background,
+                daemon=True,
+                name="guardian-check"
+            )
+            guardian_thread.start()
 
         # ── Activity Digest ──────────────────────────────────────────
         if (now.hour in ACTIVITY_DIGEST_HOURS and

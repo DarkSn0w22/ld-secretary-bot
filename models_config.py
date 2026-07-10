@@ -39,6 +39,7 @@ AGENT_MODELS = {
     "sigma":  SONNET,   # Data Analyst — อัปเป็น OPUS ได้ถ้าวิเคราะห์เชิงลึก
     "lens":   SONNET,   # Creator — content/quiz
     "rex":    SONNET,   # Retail MD — sales analysis, branch performance
+    "guardian": SONNET, # Dashboard Guardian — เฝ้าดู Dashboard API รายสัปดาห์
     "scheduler": HAIKU,  # งาน batch/autonomous — ใช้ Haiku ประหยัด
     "autonomous": HAIKU, # watch cycle — ถูกที่สุด
 }

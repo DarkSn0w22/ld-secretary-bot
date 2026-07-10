@@ -29,6 +29,7 @@ from web_agent import run_web_admin
 from data_agent import run_data_analyst
 from creator_agent import run_creator
 from retail_md_agent import run_retail_md, download_line_file, parse_excel_to_text, parse_pdf_sales_report
+from guardian_agent import run_guardian
 from models_config import print_model_summary
 from agent_log import log_agent, get_logs, clear_logs
 from agent_bus import bus
@@ -266,6 +267,17 @@ TOOLS = [
             "required": ["task"]
         }
     },
+    {
+        "name": "ask_guardian",
+        "description": "ให้ Guardian AI ตรวจสุขภาพ L&D Dashboard API สดๆ (survey/cost/asset/oar/area/assessment) หรือส่ง test notification เช็ค Teams webhook",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string", "description": "เช่น เช็คสถานะ dashboard ตอนนี้, ส่ง test notification"}
+            },
+            "required": ["task"]
+        }
+    },
 ]
 # ── Inject shared save/read tools (write_to_sheets, read_any_sheet, create_drive_file) ──
 from agent_save_tools import SAVE_TOOLS
@@ -325,6 +337,7 @@ def execute_tool(tool_name, tool_input):
         "ask_data_analyst":    ("sigma",  lambda i: i.get("task", "")),
         "ask_creator":         ("lens",   lambda i: i.get("task", "")),
         "ask_retail_md":       ("rex",    lambda i: i.get("task", "")),
+        "ask_guardian":        ("guardian", lambda i: i.get("task", "")),
     }
     if tool_name in AGENT_TOOL_MAP:
         agent_id, get_task = AGENT_TOOL_MAP[tool_name]
@@ -811,6 +824,7 @@ DASHBOARD_AGENTS = {
     "sigma":  run_data_analyst,
     "lens":   run_creator,
     "rex":    run_retail_md,
+    "guardian": run_guardian,
 }
 
 DASHBOARD_USER_ID = "dashboard-console"  # user id แยกสำหรับสั่งงานผ่านเว็บ
@@ -845,7 +859,7 @@ def dashboard():
 def api_ping():
     if not _check_dashboard_auth(request):
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify({"status": "ok", "agents": 11})
+    return jsonify({"status": "ok", "agents": 12})
 
 
 @app.route("/api/agent", methods=["POST"])
@@ -967,6 +981,7 @@ def _start_agent_bus():
     bus.register("sigma",  run_data_analyst)
     bus.register("lens",   run_creator)
     bus.register("rex",    run_retail_md)
+    bus.register("guardian", run_guardian)
     print(f"[Bus] {bus.online_count()} agents online ✓")
 
 @app.route("/api/setup-richmenu", methods=["POST"])
